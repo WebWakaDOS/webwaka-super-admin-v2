@@ -3,27 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2026-03-15"
 compatibility_flags = ["nodejs_compat"]
 
-[build]
-command = "npm run build"
-
 [env.production]
 name = "webwaka-super-admin-api-prod"
-routes = [
-  { pattern = "api.webwaka-super-admin.manus.space/*", zone_name = "manus.space" }
-]
 vars = { ENVIRONMENT = "production" }
-kv_namespaces = [
-  { binding = "SESSIONS", id = "prod-sessions", preview_id = "dev-sessions" },
-  { binding = "CACHE", id = "prod-cache", preview_id = "dev-cache" }
-]
 
 [env.staging]
 name = "webwaka-super-admin-api-staging"
-routes = [
-  { pattern = "api-staging.webwaka-super-admin.manus.space/*", zone_name = "manus.space" }
-]
 vars = { ENVIRONMENT = "staging" }
-kv_namespaces = [
-  { binding = "SESSIONS", id = "staging-sessions", preview_id = "dev-sessions" },
-  { binding = "CACHE", id = "staging-cache", preview_id = "dev-cache" }
-]

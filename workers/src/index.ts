@@ -46,23 +46,37 @@ app.get('/health', (c) => {
 
 // ============ Auth Endpoints ============
 app.post('/auth/login', async (c) => {
-  const { email, password } = await c.req.json()
+  try {
+    const { email, password } = await c.req.json()
 
-  // Mock authentication
-  if (email === 'admin@webwaka.com' && password === 'password') {
-    const token = 'mock-jwt-token-' + Date.now()
-    await c.env.SESSIONS.put(token, JSON.stringify({ email, role: 'super-admin' }), {
-      expirationTtl: 86400,
-    })
+    // Mock authentication
+    if (email === 'admin@webwaka.com' && password === 'password') {
+      const token = 'mock-jwt-token-' + Date.now()
+      
+      // Try to store in KV, but don't fail if not available
+      try {
+        if (c.env.SESSIONS) {
+          await c.env.SESSIONS.put(token, JSON.stringify({ email, role: 'super-admin' }), {
+            expirationTtl: 86400,
+          })
+        }
+      } catch (kvError) {
+        console.warn('KV storage unavailable, continuing without session storage', kvError)
+      }
 
-    return c.json({
-      success: true,
-      token,
-      user: { email, role: 'super-admin' },
-    })
+      return c.json({
+        success: true,
+        token,
+        user: { email, role: 'super-admin' },
+      })
+    }
+
+    throw new HTTPException(401, { message: 'Invalid credentials' })
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Login error:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
   }
-
-  throw new HTTPException(401, { message: 'Invalid credentials' })
 })
 
 app.post('/auth/logout', async (c) => {
@@ -319,11 +333,12 @@ app.notFound((c) => {
 })
 
 app.onError((err, c) => {
-  console.error(err)
+  console.error('Error:', err)
   if (err instanceof HTTPException) {
     return c.json({ error: err.message }, err.status)
   }
-  return c.json({ error: 'Internal Server Error' }, 500)
+  const message = err instanceof Error ? err.message : 'Internal Server Error'
+  return c.json({ error: message }, 500)
 })
 
 export default app

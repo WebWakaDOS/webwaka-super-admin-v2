@@ -31,7 +31,7 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // API base URL - will be set based on environment
-const API_BASE = import.meta.env.DEV ? 'http://localhost:8787' : '/api';
+const API_BASE = import.meta.env.DEV ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev';
 
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {

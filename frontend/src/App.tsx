@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Router } from "wouter";
+import { useHashLocation } from "wouter/use-hash-location";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -22,7 +23,7 @@ import SettingsPage from "./pages/Settings";
 
 const Analytics = () => <div className="p-6"><h1 className="text-2xl font-bold">Analytics</h1></div>;
 
-function Router() {
+function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -140,10 +141,12 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <AuthProvider>
           <TenantProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
+            <Router hook={useHashLocation}>
+              <TooltipProvider>
+                <Toaster />
+                <AppRouter />
+              </TooltipProvider>
+            </Router>
           </TenantProvider>
         </AuthProvider>
       </ThemeProvider>

@@ -1,5 +1,5 @@
 // API client for Hono Workers backend
-const API_BASE = import.meta.env.DEV ? 'http://localhost:8787' : '/api'
+const API_BASE = import.meta.env.DEV ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev'
 
 export interface ApiResponse<T> {
   success?: boolean

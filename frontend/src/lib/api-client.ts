@@ -3,7 +3,7 @@
  * Handles all communication with backend services
  */
 
-const API_BASE_URL = import.meta.env.VITE_FRONTEND_FORGE_API_URL || 'http://localhost:8787';
+const API_BASE_URL = import.meta.env.VITE_FRONTEND_FORGE_API_URL || 'https://webwaka-super-admin-api.webwaka.workers.dev';
 const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY || 'dev-key';
 
 interface ApiResponse<T> {

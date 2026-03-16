@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": ["/assets/*"],
+  "routes": [
+    {
+      "pattern": "^/assets/.*",
+      "methods": ["GET"],
+      "exclude": true
+    },
+    {
+      "pattern": "^/.*",
+      "methods": ["GET"],
+      "path": "/index.html"
+    }
+  ]
+}
