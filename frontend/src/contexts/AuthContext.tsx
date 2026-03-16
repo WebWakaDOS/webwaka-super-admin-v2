@@ -30,8 +30,15 @@ export interface AuthContextType {
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// API base URL - will be set based on environment
-const API_BASE = import.meta.env.DEV ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev';
+// API base URL - evaluated at runtime to ensure correct endpoint is used
+function getAPIBase() {
+  if (typeof window === 'undefined') {
+    return 'https://webwaka-super-admin-api.webwaka.workers.dev';
+  }
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  return isLocalhost ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev';
+}
+const API_BASE = getAPIBase();
 
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -61,7 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
+      const apiBase = getAPIBase();
+      const response = await fetch(`${apiBase}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -98,7 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       if (token) {
-        await fetch(`${API_BASE}/auth/logout`, {
+        const apiBase = getAPIBase();
+        await fetch(`${apiBase}/auth/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

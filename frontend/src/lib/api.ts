@@ -1,5 +1,14 @@
 // API client for Hono Workers backend
-const API_BASE = import.meta.env.DEV ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev'
+// Evaluate API base at runtime to ensure correct endpoint is used
+function getAPIBase() {
+  if (typeof window === 'undefined') {
+    return 'https://webwaka-super-admin-api.webwaka.workers.dev';
+  }
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  return isLocalhost ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev';
+}
+
+const API_BASE = getAPIBase();
 
 export interface ApiResponse<T> {
   success?: boolean
@@ -12,8 +21,8 @@ export class ApiClient {
   private baseUrl: string
   private token: string | null = null
 
-  constructor(baseUrl: string = API_BASE) {
-    this.baseUrl = baseUrl
+  constructor(baseUrl: string = '') {
+    this.baseUrl = baseUrl || getAPIBase()
     this.token = localStorage.getItem('auth_token')
   }
 
