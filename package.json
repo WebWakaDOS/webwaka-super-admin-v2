@@ -1,0 +1,18 @@
+{
+  "name": "webwaka-super-admin-v2",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "WebWaka Super Admin - Cloudflare Workers Edition",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "workers"
+  ],
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "build": "pnpm -r build",
+    "deploy": "pnpm -r deploy",
+    "test": "pnpm -r test",
+    "format": "pnpm -r format"
+  }
+}
