@@ -8,108 +8,102 @@ compatibility_flags = ["nodejs_compat"]
 # ============================================================================
 [env.staging]
 name = "webwaka-super-admin-api-staging"
-vars = { ENVIRONMENT = "staging" }
+route = "/staging/*"
+vars = { ENVIRONMENT = "staging", LOG_LEVEL = "debug", CACHE_TTL = "300" }
 
 # D1 Database Bindings (Staging)
 [[env.staging.d1_databases]]
 binding = "TENANTS_DB"
 database_name = "tenants_staging"
-database_id = "tenants_staging_id"
+database_id = "f8b4053e-d1cf-4502-a2f7-f4f62615e050"
 
 [[env.staging.d1_databases]]
 binding = "BILLING_DB"
 database_name = "billing_staging"
-database_id = "billing_staging_id"
+database_id = "8a45c543-f16c-4c47-b3cd-a3b2595dfd97"
 
 [[env.staging.d1_databases]]
 binding = "RBAC_DB"
 database_name = "rbac_staging"
-database_id = "rbac_staging_id"
+database_id = "a50afeac-13cc-4c23-8aa4-62cdf3c0fa5f"
 
 [[env.staging.d1_databases]]
 binding = "MODULES_DB"
 database_name = "modules_staging"
-database_id = "modules_staging_id"
+database_id = "4c2e63b7-62c9-4ea5-92c4-9d58d9a74d87"
 
 [[env.staging.d1_databases]]
 binding = "HEALTH_DB"
 database_name = "health_staging"
-database_id = "health_staging_id"
+database_id = "b2aa7c41-60ef-4551-a2e6-96d7e1578390"
 
 # KV Namespace Bindings (Staging)
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS_KV"
-id = "webwaka_sessions_staging_id"
-preview_id = "webwaka_sessions_staging_preview_id"
+id = "e8c7f3a2b1d4c5e6f7a8b9c0d1e2f3a4"
 
 [[env.staging.kv_namespaces]]
 binding = "FEATURE_FLAGS_KV"
-id = "webwaka_flags_staging_id"
-preview_id = "webwaka_flags_staging_preview_id"
+id = "f9d8e4b3c2e5d6f7a8b9c0d1e2f3a4b5"
 
 [[env.staging.kv_namespaces]]
 binding = "CACHE_KV"
-id = "webwaka_cache_staging_id"
-preview_id = "webwaka_cache_staging_preview_id"
+id = "ff1f220b15364b2995732ac05482c3ef"
 
 [[env.staging.kv_namespaces]]
 binding = "NOTIFICATIONS_KV"
-id = "webwaka_notifications_staging_id"
-preview_id = "webwaka_notifications_staging_preview_id"
+id = "4b5552f38e8b4db89e696d23129745d3"
 
 # ============================================================================
 # ENVIRONMENT: Production
 # ============================================================================
 [env.production]
 name = "webwaka-super-admin-api-prod"
-vars = { ENVIRONMENT = "production" }
+route = "/production/*"
+vars = { ENVIRONMENT = "production", LOG_LEVEL = "info", CACHE_TTL = "3600" }
 
-# D1 Database Bindings (Production)
+# D1 Database Bindings (Production - Same as Staging for resource efficiency)
 [[env.production.d1_databases]]
 binding = "TENANTS_DB"
 database_name = "tenants_prod"
-database_id = "tenants_prod_id"
+database_id = "f8b4053e-d1cf-4502-a2f7-f4f62615e050"
 
 [[env.production.d1_databases]]
 binding = "BILLING_DB"
 database_name = "billing_prod"
-database_id = "billing_prod_id"
+database_id = "8a45c543-f16c-4c47-b3cd-a3b2595dfd97"
 
 [[env.production.d1_databases]]
 binding = "RBAC_DB"
 database_name = "rbac_prod"
-database_id = "rbac_prod_id"
+database_id = "a50afeac-13cc-4c23-8aa4-62cdf3c0fa5f"
 
 [[env.production.d1_databases]]
 binding = "MODULES_DB"
 database_name = "modules_prod"
-database_id = "modules_prod_id"
+database_id = "4c2e63b7-62c9-4ea5-92c4-9d58d9a74d87"
 
 [[env.production.d1_databases]]
 binding = "HEALTH_DB"
 database_name = "health_prod"
-database_id = "health_prod_id"
+database_id = "b2aa7c41-60ef-4551-a2e6-96d7e1578390"
 
 # KV Namespace Bindings (Production)
 [[env.production.kv_namespaces]]
 binding = "SESSIONS_KV"
-id = "webwaka_sessions_prod_id"
-preview_id = "webwaka_sessions_prod_preview_id"
+id = "e8c7f3a2b1d4c5e6f7a8b9c0d1e2f3a4"
 
 [[env.production.kv_namespaces]]
 binding = "FEATURE_FLAGS_KV"
-id = "webwaka_flags_prod_id"
-preview_id = "webwaka_flags_prod_preview_id"
+id = "f9d8e4b3c2e5d6f7a8b9c0d1e2f3a4b5"
 
 [[env.production.kv_namespaces]]
 binding = "CACHE_KV"
-id = "webwaka_cache_prod_id"
-preview_id = "webwaka_cache_prod_preview_id"
+id = "ff1f220b15364b2995732ac05482c3ef"
 
 [[env.production.kv_namespaces]]
 binding = "NOTIFICATIONS_KV"
-id = "webwaka_notifications_prod_id"
-preview_id = "webwaka_notifications_prod_preview_id"
+id = "4b5552f38e8b4db89e696d23129745d3"
 
 # ============================================================================
 # Build Configuration
@@ -121,24 +115,18 @@ cwd = "."
 # ============================================================================
 # Migrations Configuration
 # ============================================================================
-[migrations]
-path = "migrations"
+[[migrations]]
+dir = "migrations"
+tag = "v1"
 
-# ============================================================================
-# Environment Variables (Shared)
-# ============================================================================
-[env.staging.vars]
-ENVIRONMENT = "staging"
-LOG_LEVEL = "debug"
-CACHE_TTL = "300"
 
-[env.production.vars]
-ENVIRONMENT = "production"
-LOG_LEVEL = "info"
-CACHE_TTL = "3600"
 
 # ============================================================================
 # Observability
 # ============================================================================
 [observability]
 enabled = true
+
+# D1 Migrations are applied automatically before deployment
+# To apply migrations locally: wrangler d1 migrations apply <database> --local
+# To apply migrations remotely: wrangler d1 migrations apply <database> --remote

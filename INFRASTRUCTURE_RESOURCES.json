@@ -1,0 +1,132 @@
+{
+  "created_at": "2026-03-17T16:17:55.590Z",
+  "staging": {
+    "databases": [
+      {
+        "name": "tenants_staging",
+        "description": "Tenant registry and multi-tenancy core",
+        "success": false,
+        "error": "Command failed: wrangler d1 create tenants_staging\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-16-57_123.log\"\n"
+      },
+      {
+        "name": "billing_staging",
+        "description": "Immutable ledger, commissions, escrow",
+        "success": false,
+        "error": "Command failed: wrangler d1 create billing_staging\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-16-58_555.log\"\n"
+      },
+      {
+        "name": "rbac_staging",
+        "description": "Roles, permissions, audit log",
+        "success": false,
+        "error": "Command failed: wrangler d1 create rbac_staging\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-17-00_085.log\"\n"
+      },
+      {
+        "name": "modules_staging",
+        "description": "Module registry, feature flags",
+        "success": false,
+        "error": "Command failed: wrangler d1 create modules_staging\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-17-01_510.log\"\n"
+      },
+      {
+        "name": "health_staging",
+        "description": "Service health, metrics, alerts",
+        "success": false,
+        "error": "Command failed: wrangler d1 create health_staging\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-17-02_954.log\"\n"
+      }
+    ],
+    "namespaces": [
+      {
+        "name": "webwaka_sessions_staging",
+        "description": "JWT session storage, 24-hour TTL",
+        "success": true,
+        "output": "\n ⛅️ wrangler 4.73.0 (update available 4.74.0)\n─────────────────────────────────────────────\nResource location: remote \n\n🌀 Creating namespace with title \"webwaka_sessions_staging\"\n✨ Success!\nTo access your new KV Namespace in your Worker, add the following snippet to your configuration file:\n{\n  \"kv_namespaces\": [\n    {\n      \"binding\": \"webwaka_sessions_staging\",\n      \"id\": \"3f66df9f1b2f4051a39f2a4b2b02d348\"\n    }\n  ]\n}\n"
+      },
+      {
+        "name": "webwaka_flags_staging",
+        "description": "Feature flag cache, 1-hour TTL",
+        "success": true,
+        "output": "\n ⛅️ wrangler 4.73.0 (update available 4.74.0)\n─────────────────────────────────────────────\nResource location: remote \n\n🌀 Creating namespace with title \"webwaka_flags_staging\"\n✨ Success!\nTo access your new KV Namespace in your Worker, add the following snippet to your configuration file:\n{\n  \"kv_namespaces\": [\n    {\n      \"binding\": \"webwaka_flags_staging\",\n      \"id\": \"d757ffe29c7c4c55adad5dcf5163104d\"\n    }\n  ]\n}\n"
+      },
+      {
+        "name": "webwaka_cache_staging",
+        "description": "Computed summaries, 15-minute TTL",
+        "success": true,
+        "output": "\n ⛅️ wrangler 4.73.0 (update available 4.74.0)\n─────────────────────────────────────────────\nResource location: remote \n\n🌀 Creating namespace with title \"webwaka_cache_staging\"\n✨ Success!\nTo access your new KV Namespace in your Worker, add the following snippet to your configuration file:\n{\n  \"kv_namespaces\": [\n    {\n      \"binding\": \"webwaka_cache_staging\",\n      \"id\": \"ff1f220b15364b2995732ac05482c3ef\"\n    }\n  ]\n}\n"
+      },
+      {
+        "name": "webwaka_notifications_staging",
+        "description": "Rate limits and retry queues, 5-minute TTL",
+        "success": true,
+        "output": "\n ⛅️ wrangler 4.73.0 (update available 4.74.0)\n─────────────────────────────────────────────\nResource location: remote \n\n🌀 Creating namespace with title \"webwaka_notifications_staging\"\n✨ Success!\nTo access your new KV Namespace in your Worker, add the following snippet to your configuration file:\n{\n  \"kv_namespaces\": [\n    {\n      \"binding\": \"webwaka_notifications_staging\",\n      \"id\": \"4b5552f38e8b4db89e696d23129745d3\"\n    }\n  ]\n}\n"
+      }
+    ]
+  },
+  "production": {
+    "databases": [
+      {
+        "name": "tenants_prod",
+        "description": "Tenant registry and multi-tenancy core",
+        "success": false,
+        "error": "Command failed: wrangler d1 create tenants_prod\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-17-24_497.log\"\n"
+      },
+      {
+        "name": "billing_prod",
+        "description": "Immutable ledger, commissions, escrow",
+        "success": false,
+        "error": "Command failed: wrangler d1 create billing_prod\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-17-25_853.log\"\n"
+      },
+      {
+        "name": "rbac_prod",
+        "description": "Roles, permissions, audit log",
+        "success": false,
+        "error": "Command failed: wrangler d1 create rbac_prod\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-17-27_308.log\"\n"
+      },
+      {
+        "name": "modules_prod",
+        "description": "Module registry, feature flags",
+        "success": false,
+        "error": "Command failed: wrangler d1 create modules_prod\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-17-29_020.log\"\n"
+      },
+      {
+        "name": "health_prod",
+        "description": "Service health, metrics, alerts",
+        "success": false,
+        "error": "Command failed: wrangler d1 create health_prod\n\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mYou have reached the maximum number of D1 databases for your account.\u001b[0m\n\n  Please consider deleting unused databases, or visit the D1 documentation to learn more: \u001b[4mhttps://developers.cloudflare.com/d1/\u001b[0m\n  \n  To list your existing databases, run: wrangler d1 list\n  To delete a database, run: wrangler d1 delete <database-name>\n\n\n🪵  Logs were written to \"/home/ubuntu/.config/.wrangler/logs/wrangler-2026-03-17_16-17-30_356.log\"\n"
+      }
+    ],
+    "namespaces": [
+      {
+        "name": "webwaka_sessions_prod",
+        "description": "JWT session storage, 24-hour TTL",
+        "success": true,
+        "output": "\n ⛅️ wrangler 4.73.0 (update available 4.74.0)\n─────────────────────────────────────────────\nResource location: remote \n\n🌀 Creating namespace with title \"webwaka_sessions_prod\"\n✨ Success!\nTo access your new KV Namespace in your Worker, add the following snippet to your configuration file:\n{\n  \"kv_namespaces\": [\n    {\n      \"binding\": \"webwaka_sessions_prod\",\n      \"id\": \"943a057e24354b4790652257e594ca6f\"\n    }\n  ]\n}\n"
+      },
+      {
+        "name": "webwaka_flags_prod",
+        "description": "Feature flag cache, 1-hour TTL",
+        "success": true,
+        "output": "\n ⛅️ wrangler 4.73.0 (update available 4.74.0)\n─────────────────────────────────────────────\nResource location: remote \n\n🌀 Creating namespace with title \"webwaka_flags_prod\"\n✨ Success!\nTo access your new KV Namespace in your Worker, add the following snippet to your configuration file:\n{\n  \"kv_namespaces\": [\n    {\n      \"binding\": \"webwaka_flags_prod\",\n      \"id\": \"78826b36eace41d28dc263a38132cc9a\"\n    }\n  ]\n}\n"
+      },
+      {
+        "name": "webwaka_cache_prod",
+        "description": "Computed summaries, 15-minute TTL",
+        "success": true,
+        "output": "\n ⛅️ wrangler 4.73.0 (update available 4.74.0)\n─────────────────────────────────────────────\nResource location: remote \n\n🌀 Creating namespace with title \"webwaka_cache_prod\"\n✨ Success!\nTo access your new KV Namespace in your Worker, add the following snippet to your configuration file:\n{\n  \"kv_namespaces\": [\n    {\n      \"binding\": \"webwaka_cache_prod\",\n      \"id\": \"bb3afd40f3fa4aa293b94bd9d503b6b5\"\n    }\n  ]\n}\n"
+      },
+      {
+        "name": "webwaka_notifications_prod",
+        "description": "Rate limits and retry queues, 5-minute TTL",
+        "success": true,
+        "output": "\n ⛅️ wrangler 4.73.0 (update available 4.74.0)\n─────────────────────────────────────────────\nResource location: remote \n\n🌀 Creating namespace with title \"webwaka_notifications_prod\"\n✨ Success!\nTo access your new KV Namespace in your Worker, add the following snippet to your configuration file:\n{\n  \"kv_namespaces\": [\n    {\n      \"binding\": \"webwaka_notifications_prod\",\n      \"id\": \"5b1bb3fcd79c438d95926b5b62fa7ce7\"\n    }\n  ]\n}\n"
+      }
+    ]
+  },
+  "instructions": [
+    "Next steps:",
+    "1. Review INFRASTRUCTURE_RESOURCES.json for database and namespace IDs",
+    "2. Update workers/wrangler.toml with actual resource IDs",
+    "3. Run: pnpm run migrate:staging",
+    "4. Run: pnpm run migrate:production",
+    "5. Run: pnpm run seed:staging",
+    "6. Run: pnpm run seed:production"
+  ]
+}

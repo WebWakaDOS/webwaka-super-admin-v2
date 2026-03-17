@@ -14,12 +14,12 @@ CREATE TABLE IF NOT EXISTS service_health (
   uptime_percent DECIMAL(5, 2) NOT NULL,
   response_time_ms INTEGER NOT NULL,
   error_count INTEGER NOT NULL DEFAULT 0,
-  last_check_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_service ON service_health(service_name),
-  INDEX idx_status ON service_health(status),
-  INDEX idx_check_time ON service_health(last_check_at DESC)
+  last_check_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_service ON service_health(service_name);
+CREATE INDEX IF NOT EXISTS idx_status ON service_health(status);
+CREATE INDEX IF NOT EXISTS idx_check_time ON service_health(last_check_at DESC);
 
 -- ============================================================================
 -- TABLE: system_metrics
@@ -30,11 +30,11 @@ CREATE TABLE IF NOT EXISTS system_metrics (
   metric_name TEXT NOT NULL,
   metric_value DECIMAL(10, 2) NOT NULL,
   unit TEXT,
-  recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_metric ON system_metrics(metric_name),
-  INDEX idx_recorded_at ON system_metrics(recorded_at DESC)
+  recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_metric ON system_metrics(metric_name);
+CREATE INDEX IF NOT EXISTS idx_recorded_at ON system_metrics(recorded_at DESC);
 
 -- ============================================================================
 -- TABLE: alerts
@@ -47,12 +47,12 @@ CREATE TABLE IF NOT EXISTS alerts (
   message TEXT NOT NULL,
   resolved BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  resolved_at TIMESTAMP,
-  
-  INDEX idx_severity ON alerts(severity),
-  INDEX idx_resolved ON alerts(resolved),
-  INDEX idx_created_at ON alerts(created_at DESC)
+  resolved_at TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_severity ON alerts(severity);
+CREATE INDEX IF NOT EXISTS idx_resolved ON alerts(resolved);
+CREATE INDEX IF NOT EXISTS idx_created_at ON alerts(created_at DESC);
 
 -- ============================================================================
 -- SEED DATA: Platform Services
