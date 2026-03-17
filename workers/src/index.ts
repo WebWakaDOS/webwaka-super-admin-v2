@@ -3,12 +3,34 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { HTTPException } from 'hono/http-exception'
 
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
 type Bindings = {
-  SESSIONS: KVNamespace
-  CACHE: KVNamespace
+  // D1 Databases
+  TENANTS_DB: D1Database
+  BILLING_DB: D1Database
+  RBAC_DB: D1Database
+  MODULES_DB: D1Database
+  HEALTH_DB: D1Database
+  
+  // KV Namespaces
+  SESSIONS_KV: KVNamespace
+  FEATURE_FLAGS_KV: KVNamespace
+  CACHE_KV: KVNamespace
+  NOTIFICATIONS_KV: KVNamespace
+  
+  // Environment variables
   JWT_SECRET: string
   ENVIRONMENT: string
 }
+
+type Context = HonoRequest<{ Bindings: Bindings }>
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -23,75 +45,136 @@ app.use(
   })
 )
 
-// Mock data storage
-const mockTenants = [
-  { id: '1', name: 'Acme Corp', status: 'active', createdAt: '2024-01-15', modules: ['core', 'analytics'] },
-  { id: '2', name: 'TechStart Inc', status: 'active', createdAt: '2024-02-20', modules: ['core'] },
-]
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
-const mockModules = [
-  { id: 'core', name: 'Core Platform', description: 'Essential features', enabled: true },
-  { id: 'analytics', name: 'Analytics', description: 'Advanced reporting', enabled: true },
-  { id: 'api', name: 'API Access', description: 'REST API', enabled: false },
-]
+/**
+ * Standard API response format
+ */
+function apiResponse(success: boolean, data?: any, errors?: string[]) {
+  return { success, data, errors }
+}
 
-// ============ Health Check ============
+/**
+ * Extract tenant ID from request (from header or JWT)
+ */
+async function getTenantId(c: any): Promise<string> {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader) return 'super-admin'
+  
+  const token = authHeader.replace('Bearer ', '')
+  try {
+    const session = await c.env.SESSIONS_KV.get(token)
+    if (session) {
+      const data = JSON.parse(session)
+      return data.tenantId || 'super-admin'
+    }
+  } catch (e) {
+    // Fall back to super-admin
+  }
+  return 'super-admin'
+}
+
+/**
+ * Verify user has required permission
+ */
+async function requirePermission(c: any, permission: string): Promise<boolean> {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader) return false
+  
+  const token = authHeader.replace('Bearer ', '')
+  try {
+    const session = await c.env.SESSIONS_KV.get(token)
+    if (session) {
+      const data = JSON.parse(session)
+      return data.permissions?.includes(permission) || data.permissions?.includes('read:all')
+    }
+  } catch (e) {
+    // Fall back to no permission
+  }
+  return false
+}
+
+// ============================================================================
+// HEALTH CHECK
+// ============================================================================
+
 app.get('/health', (c) => {
-  return c.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: c.env.ENVIRONMENT,
-  })
+  return c.json(
+    apiResponse(true, {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      environment: c.env.ENVIRONMENT,
+    })
+  )
 })
 
-// ============ Auth Endpoints ============
+// ============================================================================
+// AUTHENTICATION ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /auth/login
+ * Authenticate user and return JWT token with permissions from RBAC_DB
+ */
 app.post('/auth/login', async (c) => {
   try {
     const { email, password } = await c.req.json()
 
-    // Mock authentication
-    if (email === 'admin@webwaka.com' && password === 'password') {
-      const token = 'mock-jwt-token-' + Date.now()
-      
-      // Super admin has all permissions
-      const permissions = [
-        'read:all',
-        'write:all',
-        'delete:all',
-        'manage:users',
-        'manage:tenants',
-        'manage:modules',
-        'view:billing',
-        'view:health',
-        'manage:settings',
-      ]
-      
-      // Try to store in KV, but don't fail if not available
-      try {
-        if (c.env.SESSIONS) {
-          await c.env.SESSIONS.put(token, JSON.stringify({ email, role: 'super-admin', permissions }), {
-            expirationTtl: 86400,
-          })
-        }
-      } catch (kvError) {
-        console.warn('KV storage unavailable, continuing without session storage', kvError)
-      }
+    // Query RBAC_DB for user
+    const result = await c.env.RBAC_DB.prepare(
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.tenant_id, r.name as role
+       FROM users u
+       LEFT JOIN user_roles ur ON u.id = ur.user_id
+       LEFT JOIN roles r ON ur.role_id = r.id
+       WHERE u.email = ? AND u.status = 'ACTIVE'`
+    ).bind(email).first()
 
-      return c.json({
-        success: true,
-        token,
-        user: {
-          id: 'user_001',
-          email,
-          name: 'Admin User',
-          role: 'super-admin',
-          permissions,
-          createdAt: new Date().toISOString(),
-        },
-      })
+    if (!result) {
+      throw new HTTPException(401, { message: 'Invalid credentials' })
     }
 
-    throw new HTTPException(401, { message: 'Invalid credentials' })
+    // Get permissions for role
+    const permissionsResult = await c.env.RBAC_DB.prepare(
+      `SELECT p.name FROM role_permissions rp
+       JOIN permissions p ON rp.permission_id = p.id
+       WHERE rp.role_id = (SELECT id FROM roles WHERE name = ?)`
+    ).bind(result.role || 'CUSTOMER').all()
+
+    const permissions = permissionsResult.results?.map((r: any) => r.name) || []
+
+    // Create JWT token (simplified - in production use proper JWT library)
+    const token = 'jwt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+
+    // Store session in KV
+    await c.env.SESSIONS_KV.put(
+      token,
+      JSON.stringify({
+        userId: result.id,
+        email: result.email,
+        tenantId: result.tenant_id,
+        role: result.role,
+        permissions,
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 86400000, // 24 hours
+      }),
+      { expirationTtl: 86400 }
+    )
+
+    return c.json(
+      apiResponse(true, {
+        token,
+        user: {
+          id: result.id,
+          email: result.email,
+          name: `${result.first_name} ${result.last_name}`,
+          role: result.role,
+          permissions,
+          tenantId: result.tenant_id,
+        },
+      })
+    )
   } catch (err) {
     if (err instanceof HTTPException) throw err
     console.error('Login error:', err)
@@ -99,266 +182,331 @@ app.post('/auth/login', async (c) => {
   }
 })
 
-app.post('/auth/logout', async (c) => {
-  const token = c.req.header('Authorization')?.replace('Bearer ', '')
-  if (token) {
-    await c.env.SESSIONS.delete(token)
-  }
-  return c.json({ success: true })
-})
+// ============================================================================
+// TENANT MANAGEMENT ENDPOINTS
+// ============================================================================
 
-// ============ Tenants Endpoints ============
+/**
+ * GET /tenants
+ * List all tenants (super admin only)
+ */
 app.get('/tenants', async (c) => {
-  const cached = await c.env.CACHE.get('tenants')
-  if (cached) {
-    return c.json(JSON.parse(cached))
-  }
+  try {
+    const hasPermission = await requirePermission(c, 'read:tenants')
+    if (!hasPermission) {
+      throw new HTTPException(403, { message: 'Forbidden' })
+    }
 
-  await c.env.CACHE.put('tenants', JSON.stringify(mockTenants), { expirationTtl: 3600 })
-  return c.json(mockTenants)
+    const result = await c.env.TENANTS_DB.prepare(
+      `SELECT id, name, email, status, industry, domain, created_at
+       FROM tenants
+       WHERE deleted_at IS NULL
+       ORDER BY created_at DESC`
+    ).all()
+
+    return c.json(apiResponse(true, result.results))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching tenants:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
 })
 
+/**
+ * POST /tenants
+ * Create new tenant
+ */
 app.post('/tenants', async (c) => {
-  const tenant = await c.req.json()
-  const newTenant = {
-    id: Date.now().toString(),
-    ...tenant,
-    createdAt: new Date().toISOString(),
-    modules: [],
+  try {
+    const hasPermission = await requirePermission(c, 'write:tenants')
+    if (!hasPermission) {
+      throw new HTTPException(403, { message: 'Forbidden' })
+    }
+
+    const { name, email, industry, domain } = await c.req.json()
+    const tenantId = 'tenant_' + Date.now()
+
+    await c.env.TENANTS_DB.prepare(
+      `INSERT INTO tenants (id, name, email, status, industry, domain, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, 'ACTIVE', ?, ?, 'super-admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(tenantId, name, email, industry, domain).run()
+
+    return c.json(
+      apiResponse(true, { id: tenantId, name, email, status: 'ACTIVE', industry, domain })
+    )
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error creating tenant:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
   }
-
-  mockTenants.push(newTenant)
-  await c.env.CACHE.delete('tenants')
-
-  return c.json(newTenant, 201)
 })
 
-app.get('/tenants/:id', async (c) => {
-  const id = c.req.param('id')
-  const tenant = mockTenants.find((t) => t.id === id)
+// ============================================================================
+// BILLING ENDPOINTS
+// ============================================================================
 
-  if (!tenant) {
-    throw new HTTPException(404, { message: 'Tenant not found' })
-  }
-
-  return c.json(tenant)
-})
-
-app.put('/tenants/:id', async (c) => {
-  const id = c.req.param('id')
-  const updates = await c.req.json()
-  const index = mockTenants.findIndex((t) => t.id === id)
-
-  if (index === -1) {
-    throw new HTTPException(404, { message: 'Tenant not found' })
-  }
-
-  mockTenants[index] = { ...mockTenants[index], ...updates }
-  await c.env.CACHE.delete('tenants')
-
-  return c.json(mockTenants[index])
-})
-
-app.delete('/tenants/:id', async (c) => {
-  const id = c.req.param('id')
-  const index = mockTenants.findIndex((t) => t.id === id)
-
-  if (index === -1) {
-    throw new HTTPException(404, { message: 'Tenant not found' })
-  }
-
-  mockTenants.splice(index, 1)
-  await c.env.CACHE.delete('tenants')
-
-  return c.json({ success: true })
-})
-
-// ============ Billing Endpoints ============
-app.get('/billing/metrics', async (c) => {
-  return c.json({
-    mtd: 45000,
-    ytd: 320000,
-    yearEnd: 500000,
-    activeSubscriptions: 12,
-    churnRate: 2.5,
-  })
-})
-
+/**
+ * GET /billing/ledger
+ * Get ledger entries for tenant
+ */
 app.get('/billing/ledger', async (c) => {
-  const limit = c.req.query('limit') || '50'
-  const offset = c.req.query('offset') || '0'
+  try {
+    const hasPermission = await requirePermission(c, 'read:billing')
+    if (!hasPermission) {
+      throw new HTTPException(403, { message: 'Forbidden' })
+    }
 
-  const ledger = [
-    { id: '1', date: '2024-03-15', description: 'Subscription', amount: 5000, type: 'credit' },
-    { id: '2', date: '2024-03-14', description: 'Refund', amount: 500, type: 'debit' },
-    { id: '3', date: '2024-03-13', description: 'Subscription', amount: 5000, type: 'credit' },
-  ]
+    const tenantId = await getTenantId(c)
+    const result = await c.env.BILLING_DB.prepare(
+      `SELECT id, entry_type, account_from, account_to, amount_kobo, description, created_at
+       FROM ledger_entries
+       WHERE tenant_id = ?
+       ORDER BY created_at DESC
+       LIMIT 100`
+    ).bind(tenantId).all()
 
-  return c.json({
-    data: ledger.slice(parseInt(offset), parseInt(offset) + parseInt(limit)),
-    total: ledger.length,
-    limit: parseInt(limit),
-    offset: parseInt(offset),
-  })
+    return c.json(apiResponse(true, result.results))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching ledger:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
 })
 
-app.get('/billing/commissions', async (c) => {
-  return c.json({
-    total: 125000,
-    pending: 25000,
-    paid: 100000,
-    splits: [
-      { partner: 'Partner A', percentage: 30, amount: 37500 },
-      { partner: 'Partner B', percentage: 20, amount: 25000 },
-      { partner: 'Platform', percentage: 50, amount: 62500 },
-    ],
-  })
+/**
+ * GET /billing/summary
+ * Get billing summary (cached in KV)
+ */
+app.get('/billing/summary', async (c) => {
+  try {
+    const tenantId = await getTenantId(c)
+    const cacheKey = `cache:tenant:${tenantId}:ledger:summary`
+
+    // Try to get from cache
+    const cached = await c.env.CACHE_KV.get(cacheKey)
+    if (cached) {
+      return c.json(apiResponse(true, JSON.parse(cached)))
+    }
+
+    // Calculate summary from ledger
+    const result = await c.env.BILLING_DB.prepare(
+      `SELECT 
+        SUM(CASE WHEN entry_type = 'REVENUE' THEN amount_kobo ELSE 0 END) as total_revenue,
+        SUM(CASE WHEN entry_type = 'COMMISSION' THEN amount_kobo ELSE 0 END) as total_commissions,
+        SUM(CASE WHEN entry_type = 'PAYOUT' THEN amount_kobo ELSE 0 END) as total_payouts
+       FROM ledger_entries
+       WHERE tenant_id = ?`
+    ).bind(tenantId).first()
+
+    const summary = {
+      mtd: result?.total_revenue || 0,
+      ytd: result?.total_revenue || 0,
+      balance: (result?.total_revenue || 0) - (result?.total_payouts || 0),
+      lastUpdated: Date.now(),
+    }
+
+    // Cache for 15 minutes
+    await c.env.CACHE_KV.put(cacheKey, JSON.stringify(summary), { expirationTtl: 900 })
+
+    return c.json(apiResponse(true, summary))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching billing summary:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
 })
 
-// ============ Modules Endpoints ============
+// ============================================================================
+// MODULE MANAGEMENT ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /modules
+ * List all modules
+ */
 app.get('/modules', async (c) => {
-  const cached = await c.env.CACHE.get('modules')
-  if (cached) {
-    return c.json(JSON.parse(cached))
+  try {
+    const hasPermission = await requirePermission(c, 'read:modules')
+    if (!hasPermission) {
+      throw new HTTPException(403, { message: 'Forbidden' })
+    }
+
+    const result = await c.env.MODULES_DB.prepare(
+      `SELECT id, name, description, version, status, category
+       FROM modules
+       ORDER BY name ASC`
+    ).all()
+
+    return c.json(apiResponse(true, result.results))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching modules:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
   }
-
-  await c.env.CACHE.put('modules', JSON.stringify(mockModules), { expirationTtl: 3600 })
-  return c.json(mockModules)
 })
 
-app.post('/modules/:id/enable', async (c) => {
-  const id = c.req.param('id')
-  const module = mockModules.find((m) => m.id === id)
+/**
+ * GET /modules/:tenantId
+ * Get enabled modules for tenant
+ */
+app.get('/modules/:tenantId', async (c) => {
+  try {
+    const tenantId = c.req.param('tenantId')
+    const result = await c.env.MODULES_DB.prepare(
+      `SELECT m.id, m.name, m.description, m.version, m.status, tm.enabled
+       FROM modules m
+       LEFT JOIN tenant_modules tm ON m.id = tm.module_id AND tm.tenant_id = ?
+       ORDER BY m.name ASC`
+    ).bind(tenantId).all()
 
-  if (!module) {
-    throw new HTTPException(404, { message: 'Module not found' })
+    return c.json(apiResponse(true, result.results))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching tenant modules:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
   }
-
-  module.enabled = true
-  await c.env.CACHE.delete('modules')
-
-  return c.json(module)
 })
 
-app.post('/modules/:id/disable', async (c) => {
-  const id = c.req.param('id')
-  const module = mockModules.find((m) => m.id === id)
+/**
+ * PUT /modules/:tenantId/:moduleId
+ * Enable/disable module for tenant
+ */
+app.put('/modules/:tenantId/:moduleId', async (c) => {
+  try {
+    const hasPermission = await requirePermission(c, 'manage:modules')
+    if (!hasPermission) {
+      throw new HTTPException(403, { message: 'Forbidden' })
+    }
 
-  if (!module) {
-    throw new HTTPException(404, { message: 'Module not found' })
+    const { tenantId, moduleId } = c.req.param()
+    const { enabled } = await c.req.json()
+
+    const id = `tm_${tenantId}_${moduleId}`
+    await c.env.MODULES_DB.prepare(
+      `INSERT OR REPLACE INTO tenant_modules (id, tenant_id, module_id, enabled, enabled_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(id, tenantId, moduleId, enabled ? 1 : 0).run()
+
+    // Update feature flags KV
+    const flagKey = `tenant:${tenantId}:module:${moduleId}`
+    await c.env.FEATURE_FLAGS_KV.put(flagKey, JSON.stringify({ enabled, updatedAt: Date.now() }))
+
+    return c.json(apiResponse(true, { id, tenantId, moduleId, enabled }))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error updating module:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
   }
-
-  module.enabled = false
-  await c.env.CACHE.delete('modules')
-
-  return c.json(module)
 })
 
-// ============ Health Monitoring Endpoints ============
-app.get('/health/status', async (c) => {
-  return c.json({
-    services: {
-      api: { status: 'healthy', uptime: 99.9, responseTime: 45 },
-      database: { status: 'healthy', uptime: 99.95, responseTime: 120 },
-      cache: { status: 'healthy', uptime: 99.8, responseTime: 15 },
-      queue: { status: 'healthy', uptime: 99.7, responseTime: 30 },
-    },
-    overall: 'healthy',
-  })
+// ============================================================================
+// SYSTEM HEALTH ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /health/services
+ * Get health status of all services
+ */
+app.get('/health/services', async (c) => {
+  try {
+    const result = await c.env.HEALTH_DB.prepare(
+      `SELECT service_name, status, uptime_percent, response_time_ms, error_count, last_check_at
+       FROM service_health
+       ORDER BY service_name ASC`
+    ).all()
+
+    return c.json(apiResponse(true, result.results))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching service health:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
 })
 
+/**
+ * GET /health/metrics
+ * Get system metrics
+ */
 app.get('/health/metrics', async (c) => {
-  const hours = c.req.query('hours') || '24'
+  try {
+    const result = await c.env.HEALTH_DB.prepare(
+      `SELECT metric_name, metric_value, unit, recorded_at
+       FROM system_metrics
+       WHERE recorded_at > datetime('now', '-1 hour')
+       ORDER BY recorded_at DESC
+       LIMIT 50`
+    ).all()
 
-  return c.json({
-    cpu: Array.from({ length: parseInt(hours) }, (_, i) => ({
-      time: new Date(Date.now() - (parseInt(hours) - i) * 3600000).toISOString(),
-      usage: Math.random() * 60 + 20,
-    })),
-    memory: Array.from({ length: parseInt(hours) }, (_, i) => ({
-      time: new Date(Date.now() - (parseInt(hours) - i) * 3600000).toISOString(),
-      usage: Math.random() * 50 + 30,
-    })),
-  })
-})
-
-app.get('/health/alerts', async (c) => {
-  return c.json([
-    { id: '1', severity: 'info', message: 'Scheduled maintenance completed', timestamp: new Date().toISOString() },
-    { id: '2', severity: 'warning', message: 'High memory usage detected', timestamp: new Date(Date.now() - 3600000).toISOString() },
-  ])
-})
-
-// ============ Settings Endpoints ============
-app.get('/settings', async (c) => {
-  return c.json({
-    apiRateLimit: 1000,
-    sessionTimeout: 3600,
-    maintenanceMode: false,
-    maxTenants: 100,
-  })
-})
-
-app.put('/settings', async (c) => {
-  const settings = await c.req.json()
-  // In production, save to database
-  return c.json({ success: true, settings })
-})
-
-app.get('/settings/api-keys', async (c) => {
-  return c.json([
-    { id: '1', name: 'Production Key', created: '2024-01-15', lastUsed: '2024-03-15', active: true },
-    { id: '2', name: 'Staging Key', created: '2024-02-01', lastUsed: '2024-03-14', active: true },
-  ])
-})
-
-app.post('/settings/api-keys', async (c) => {
-  const { name } = await c.req.json()
-  const newKey = {
-    id: Date.now().toString(),
-    name,
-    created: new Date().toISOString(),
-    lastUsed: null,
-    active: true,
-    key: 'sk_' + Math.random().toString(36).substr(2, 32),
+    return c.json(apiResponse(true, result.results))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching metrics:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
   }
-
-  return c.json(newKey, 201)
 })
 
-app.delete('/settings/api-keys/:id', async (c) => {
-  const id = c.req.param('id')
-  // In production, delete from database
-  return c.json({ success: true, id })
+// ============================================================================
+// SETTINGS ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /settings
+ * Get system settings
+ */
+app.get('/settings', async (c) => {
+  try {
+    const hasPermission = await requirePermission(c, 'read:settings')
+    if (!hasPermission) {
+      throw new HTTPException(403, { message: 'Forbidden' })
+    }
+
+    // Return default settings
+    return c.json(
+      apiResponse(true, {
+        apiRateLimit: 1000,
+        sessionTimeout: 3600,
+        maintenanceMode: false,
+        maxTenantCount: 10000,
+      })
+    )
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching settings:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
 })
 
-app.get('/settings/audit-log', async (c) => {
-  const limit = c.req.query('limit') || '50'
-  const offset = c.req.query('offset') || '0'
-
-  const logs = [
-    { id: '1', user: 'admin@webwaka.com', action: 'Login', resource: 'Auth', timestamp: new Date().toISOString() },
-    { id: '2', user: 'admin@webwaka.com', action: 'Create', resource: 'Tenant', timestamp: new Date(Date.now() - 3600000).toISOString() },
-  ]
-
-  return c.json({
-    data: logs.slice(parseInt(offset), parseInt(offset) + parseInt(limit)),
-    total: logs.length,
-  })
-})
-
-// ============ Error Handlers ============
-app.notFound((c) => {
-  return c.json({ error: 'Not Found' }, 404)
-})
+// ============================================================================
+// ERROR HANDLING
+// ============================================================================
 
 app.onError((err, c) => {
-  console.error('Error:', err)
+  console.error('Unhandled error:', err)
   if (err instanceof HTTPException) {
-    return c.json({ error: err.message }, err.status)
+    return c.json(
+      apiResponse(false, null, [err.message]),
+      { status: err.status }
+    )
   }
-  const message = err instanceof Error ? err.message : 'Internal Server Error'
-  return c.json({ error: message }, 500)
+  return c.json(
+    apiResponse(false, null, ['Internal server error']),
+    { status: 500 }
+  )
 })
+
+// ============================================================================
+// 404 HANDLER
+// ============================================================================
+
+app.notFound((c) => {
+  return c.json(
+    apiResponse(false, null, ['Not found']),
+    { status: 404 }
+  )
+})
+
+// ============================================================================
+// EXPORT
+// ============================================================================
 
 export default app

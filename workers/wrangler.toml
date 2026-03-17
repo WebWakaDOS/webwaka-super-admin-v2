@@ -3,10 +3,142 @@ main = "src/index.ts"
 compatibility_date = "2026-03-15"
 compatibility_flags = ["nodejs_compat"]
 
+# ============================================================================
+# ENVIRONMENT: Staging
+# ============================================================================
+[env.staging]
+name = "webwaka-super-admin-api-staging"
+vars = { ENVIRONMENT = "staging" }
+
+# D1 Database Bindings (Staging)
+[[env.staging.d1_databases]]
+binding = "TENANTS_DB"
+database_name = "tenants_staging"
+database_id = "tenants_staging_id"
+
+[[env.staging.d1_databases]]
+binding = "BILLING_DB"
+database_name = "billing_staging"
+database_id = "billing_staging_id"
+
+[[env.staging.d1_databases]]
+binding = "RBAC_DB"
+database_name = "rbac_staging"
+database_id = "rbac_staging_id"
+
+[[env.staging.d1_databases]]
+binding = "MODULES_DB"
+database_name = "modules_staging"
+database_id = "modules_staging_id"
+
+[[env.staging.d1_databases]]
+binding = "HEALTH_DB"
+database_name = "health_staging"
+database_id = "health_staging_id"
+
+# KV Namespace Bindings (Staging)
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS_KV"
+id = "webwaka_sessions_staging_id"
+preview_id = "webwaka_sessions_staging_preview_id"
+
+[[env.staging.kv_namespaces]]
+binding = "FEATURE_FLAGS_KV"
+id = "webwaka_flags_staging_id"
+preview_id = "webwaka_flags_staging_preview_id"
+
+[[env.staging.kv_namespaces]]
+binding = "CACHE_KV"
+id = "webwaka_cache_staging_id"
+preview_id = "webwaka_cache_staging_preview_id"
+
+[[env.staging.kv_namespaces]]
+binding = "NOTIFICATIONS_KV"
+id = "webwaka_notifications_staging_id"
+preview_id = "webwaka_notifications_staging_preview_id"
+
+# ============================================================================
+# ENVIRONMENT: Production
+# ============================================================================
 [env.production]
 name = "webwaka-super-admin-api-prod"
 vars = { ENVIRONMENT = "production" }
 
-[env.staging]
-name = "webwaka-super-admin-api-staging"
-vars = { ENVIRONMENT = "staging" }
+# D1 Database Bindings (Production)
+[[env.production.d1_databases]]
+binding = "TENANTS_DB"
+database_name = "tenants_prod"
+database_id = "tenants_prod_id"
+
+[[env.production.d1_databases]]
+binding = "BILLING_DB"
+database_name = "billing_prod"
+database_id = "billing_prod_id"
+
+[[env.production.d1_databases]]
+binding = "RBAC_DB"
+database_name = "rbac_prod"
+database_id = "rbac_prod_id"
+
+[[env.production.d1_databases]]
+binding = "MODULES_DB"
+database_name = "modules_prod"
+database_id = "modules_prod_id"
+
+[[env.production.d1_databases]]
+binding = "HEALTH_DB"
+database_name = "health_prod"
+database_id = "health_prod_id"
+
+# KV Namespace Bindings (Production)
+[[env.production.kv_namespaces]]
+binding = "SESSIONS_KV"
+id = "webwaka_sessions_prod_id"
+preview_id = "webwaka_sessions_prod_preview_id"
+
+[[env.production.kv_namespaces]]
+binding = "FEATURE_FLAGS_KV"
+id = "webwaka_flags_prod_id"
+preview_id = "webwaka_flags_prod_preview_id"
+
+[[env.production.kv_namespaces]]
+binding = "CACHE_KV"
+id = "webwaka_cache_prod_id"
+preview_id = "webwaka_cache_prod_preview_id"
+
+[[env.production.kv_namespaces]]
+binding = "NOTIFICATIONS_KV"
+id = "webwaka_notifications_prod_id"
+preview_id = "webwaka_notifications_prod_preview_id"
+
+# ============================================================================
+# Build Configuration
+# ============================================================================
+[build]
+command = "npm run build"
+cwd = "."
+
+# ============================================================================
+# Migrations Configuration
+# ============================================================================
+[migrations]
+path = "migrations"
+
+# ============================================================================
+# Environment Variables (Shared)
+# ============================================================================
+[env.staging.vars]
+ENVIRONMENT = "staging"
+LOG_LEVEL = "debug"
+CACHE_TTL = "300"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+CACHE_TTL = "3600"
+
+# ============================================================================
+# Observability
+# ============================================================================
+[observability]
+enabled = true

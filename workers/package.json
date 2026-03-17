@@ -1,21 +1,48 @@
 {
-  "name": "webwaka-super-admin-workers",
-  "version": "2.0.0",
+  "name": "webwaka-super-admin-api",
+  "version": "1.0.0",
+  "description": "WebWaka Super Admin API with Cloudflare Workers, D1, and KV",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
+    "build": "tsc && esbuild src/index.ts --bundle --platform=node --target=es2020 --outfile=dist/index.js",
     "dev": "wrangler dev",
-    "build": "wrangler build",
     "deploy": "wrangler deploy",
-    "format": "prettier --write ."
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "migrate:staging": "wrangler d1 migrations apply --env staging",
+    "migrate:production": "wrangler d1 migrations apply --env production",
+    "seed:staging": "node scripts/seed-staging.mjs",
+    "seed:production": "node scripts/seed-production.mjs",
+    "db:shell:staging": "wrangler d1 execute --env staging",
+    "db:shell:production": "wrangler d1 execute --env production",
+    "db:backup:staging": "wrangler d1 backup --env staging",
+    "db:backup:production": "wrangler d1 backup --env production"
   },
+  "keywords": [
+    "webwaka",
+    "cloudflare",
+    "workers",
+    "d1",
+    "kv",
+    "super-admin",
+    "multi-tenant"
+  ],
+  "author": "WebWaka Team",
+  "license": "MIT",
   "dependencies": {
-    "hono": "^4.5.11",
-    "jose": "^5.9.6"
+    "hono": "^4.0.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250117.1",
-    "prettier": "^3.6.2",
-    "typescript": "5.6.3",
-    "wrangler": "^3.90.0"
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.19.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0",
+    "wrangler": "^3.0.0"
   }
 }
