@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { HTTPException } from 'hono/http-exception'
+import type { Context as HonoContext } from 'hono'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -26,7 +27,7 @@ type Bindings = {
   ENVIRONMENT: string
 }
 
-type Context = HonoRequest<{ Bindings: Bindings }>
+type Context = HonoContext<{ Bindings: Bindings }>
 
 // ============================================================================
 // INITIALIZATION
@@ -299,9 +300,9 @@ app.get('/billing/summary', async (c) => {
     ).bind(tenantId).first()
 
     const summary = {
-      mtd: result?.total_revenue || 0,
-      ytd: result?.total_revenue || 0,
-      balance: (result?.total_revenue || 0) - (result?.total_payouts || 0),
+      mtd: Number(result?.total_revenue) || 0,
+      ytd: Number(result?.total_revenue) || 0,
+      balance: (Number(result?.total_revenue) || 0) - (Number(result?.total_payouts) || 0),
       lastUpdated: Date.now(),
     }
 

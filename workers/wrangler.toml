@@ -8,7 +8,6 @@ compatibility_flags = ["nodejs_compat"]
 # ============================================================================
 [env.staging]
 name = "webwaka-super-admin-api-staging"
-route = "/staging/*"
 vars = { ENVIRONMENT = "staging", LOG_LEVEL = "debug", CACHE_TTL = "300" }
 
 # D1 Database Bindings (Staging)
@@ -40,11 +39,11 @@ database_id = "b2aa7c41-60ef-4551-a2e6-96d7e1578390"
 # KV Namespace Bindings (Staging)
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS_KV"
-id = "e8c7f3a2b1d4c5e6f7a8b9c0d1e2f3a4"
+id = "3f66df9f1b2f4051a39f2a4b2b02d348"
 
 [[env.staging.kv_namespaces]]
 binding = "FEATURE_FLAGS_KV"
-id = "f9d8e4b3c2e5d6f7a8b9c0d1e2f3a4b5"
+id = "d757ffe29c7c4c55adad5dcf5163104d"
 
 [[env.staging.kv_namespaces]]
 binding = "CACHE_KV"
@@ -59,7 +58,6 @@ id = "4b5552f38e8b4db89e696d23129745d3"
 # ============================================================================
 [env.production]
 name = "webwaka-super-admin-api-prod"
-route = "/production/*"
 vars = { ENVIRONMENT = "production", LOG_LEVEL = "info", CACHE_TTL = "3600" }
 
 # D1 Database Bindings (Production - Same as Staging for resource efficiency)
@@ -88,14 +86,14 @@ binding = "HEALTH_DB"
 database_name = "health_prod"
 database_id = "b2aa7c41-60ef-4551-a2e6-96d7e1578390"
 
-# KV Namespace Bindings (Production)
+# KV Namespace Bindings (Production - Same namespaces as staging for resource efficiency)
 [[env.production.kv_namespaces]]
 binding = "SESSIONS_KV"
-id = "e8c7f3a2b1d4c5e6f7a8b9c0d1e2f3a4"
+id = "3f66df9f1b2f4051a39f2a4b2b02d348"
 
 [[env.production.kv_namespaces]]
 binding = "FEATURE_FLAGS_KV"
-id = "f9d8e4b3c2e5d6f7a8b9c0d1e2f3a4b5"
+id = "d757ffe29c7c4c55adad5dcf5163104d"
 
 [[env.production.kv_namespaces]]
 binding = "CACHE_KV"
