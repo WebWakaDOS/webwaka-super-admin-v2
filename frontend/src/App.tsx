@@ -20,8 +20,7 @@ import Billing from "./pages/Billing";
 import ModuleRegistry from "./pages/ModuleRegistry";
 import SystemHealth from "./pages/SystemHealth";
 import SettingsPage from "./pages/Settings";
-
-const Analytics = () => <div className="p-6"><h1 className="text-2xl font-bold">Analytics</h1></div>;
+import Analytics from "./pages/Analytics";
 
 function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();

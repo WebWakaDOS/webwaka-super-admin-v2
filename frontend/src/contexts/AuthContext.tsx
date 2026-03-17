@@ -80,21 +80,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await response.json();
-      const mockUser: User = {
-        id: 'user_001',
-        email,
-        name: 'Admin User',
-        role: 'super_admin',
-        permissions: ['read:all', 'write:all', 'delete:all', 'manage:users', 'manage:tenants'],
-        avatar: undefined,
-        createdAt: new Date().toISOString(),
+      
+      // Use actual user data from API response
+      const user: User = {
+        id: data.user.id || 'user_001',
+        email: data.user.email || email,
+        name: data.user.name || 'Admin User',
+        role: (data.user.role === 'super-admin' ? 'super_admin' : data.user.role) as UserRole,
+        permissions: data.user.permissions || [],
+        avatar: data.user.avatar,
+        createdAt: data.user.createdAt || new Date().toISOString(),
         lastLogin: new Date().toISOString(),
       };
 
-      setUser(mockUser);
+      setUser(user);
       setToken(data.token);
       localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(mockUser));
+      localStorage.setItem('auth_user', JSON.stringify(user));
     } catch (error) {
       console.error('Login error:', error);
       throw error;

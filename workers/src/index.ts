@@ -53,10 +53,23 @@ app.post('/auth/login', async (c) => {
     if (email === 'admin@webwaka.com' && password === 'password') {
       const token = 'mock-jwt-token-' + Date.now()
       
+      // Super admin has all permissions
+      const permissions = [
+        'read:all',
+        'write:all',
+        'delete:all',
+        'manage:users',
+        'manage:tenants',
+        'manage:modules',
+        'view:billing',
+        'view:health',
+        'manage:settings',
+      ]
+      
       // Try to store in KV, but don't fail if not available
       try {
         if (c.env.SESSIONS) {
-          await c.env.SESSIONS.put(token, JSON.stringify({ email, role: 'super-admin' }), {
+          await c.env.SESSIONS.put(token, JSON.stringify({ email, role: 'super-admin', permissions }), {
             expirationTtl: 86400,
           })
         }
@@ -67,7 +80,14 @@ app.post('/auth/login', async (c) => {
       return c.json({
         success: true,
         token,
-        user: { email, role: 'super-admin' },
+        user: {
+          id: 'user_001',
+          email,
+          name: 'Admin User',
+          role: 'super-admin',
+          permissions,
+          createdAt: new Date().toISOString(),
+        },
       })
     }
 
