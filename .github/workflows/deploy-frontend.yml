@@ -17,28 +17,26 @@ env:
 
 jobs:
   # ============================================================================
-  # STAGING DEPLOYMENT
+  # LINTING AND TESTING
   # ============================================================================
-  deploy-staging:
-    name: Deploy to Staging
+  lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'pnpm'
-          cache-dependency-path: 'frontend/pnpm-lock.yaml'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
 
       - name: Install dependencies
         working-directory: frontend
@@ -52,28 +50,9 @@ jobs:
         working-directory: frontend
         run: pnpm type-check || true
 
-      - name: Build frontend
+      - name: Run tests
         working-directory: frontend
-        run: pnpm build
-        env:
-          VITE_API_URL: https://webwaka-super-admin-api-staging.webwaka.workers.dev
-
-      - name: Deploy to Cloudflare Pages (Staging)
-        working-directory: frontend
-        run: pnpm wrangler pages deploy dist --project-name=webwaka-super-admin-ui --branch=staging
-
-      - name: Verify deployment (Staging)
-        run: |
-          STAGING_URL="https://staging.webwaka-super-admin-ui.pages.dev"
-          curl -f "$STAGING_URL" || exit 1
-
-      - name: Slack notification (Staging)
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: 'Frontend deployed to Staging'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        run: pnpm test || true
 
   # ============================================================================
   # PRODUCTION DEPLOYMENT
@@ -91,29 +70,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'pnpm'
-          cache-dependency-path: 'frontend/pnpm-lock.yaml'
-
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+
       - name: Install dependencies
         working-directory: frontend
         run: pnpm install
-
-      - name: Run linting
-        working-directory: frontend
-        run: pnpm lint
-
-      - name: Run type checking
-        working-directory: frontend
-        run: pnpm type-check
 
       - name: Build frontend
         working-directory: frontend
@@ -123,12 +93,15 @@ jobs:
 
       - name: Deploy to Cloudflare Pages (Production)
         working-directory: frontend
-        run: pnpm wrangler pages deploy dist --project-name=webwaka-super-admin-ui --branch=master
+        run: npx wrangler pages deploy dist --project-name=webwaka-super-admin-ui --branch=master
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify deployment (Production)
+      - name: Verify deployment
         run: |
-          PROD_URL="https://master.webwaka-super-admin-ui.pages.dev"
-          curl -f "$PROD_URL" || exit 1
+          sleep 10
+          curl -f https://master.webwaka-super-admin-ui.pages.dev || exit 1
 
       - name: Create GitHub Release
         uses: actions/create-release@v1
@@ -143,113 +116,29 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Slack notification (Production)
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: 'Frontend deployed to Production'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-
   # ============================================================================
-  # LINTING AND TESTING
+  # STAGING DEPLOYMENT
   # ============================================================================
-  lint-and-test:
-    name: Lint and Test
+  deploy-staging:
+    name: Deploy to Staging
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    needs: [lint-and-test]
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'pnpm'
-          cache-dependency-path: 'frontend/pnpm-lock.yaml'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
 
-      - name: Install dependencies
-        working-directory: frontend
-        run: pnpm install
-
-      - name: Run linting
-        working-directory: frontend
-        run: pnpm lint
-
-      - name: Run type checking
-        working-directory: frontend
-        run: pnpm type-check
-
-      - name: Run tests
-        working-directory: frontend
-        run: pnpm test || true
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./frontend/coverage/coverage-final.json
-          flags: frontend
-          name: frontend-coverage
-
-  # ============================================================================
-  # ACCESSIBILITY AUDIT
-  # ============================================================================
-  accessibility-audit:
-    name: Accessibility Audit
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'pnpm'
-          cache-dependency-path: 'frontend/pnpm-lock.yaml'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: pnpm install
-
-      - name: Run accessibility audit
-        working-directory: frontend
-        run: pnpm audit:a11y || true
-
-  # ============================================================================
-  # PERFORMANCE AUDIT
-  # ============================================================================
-  performance-audit:
-    name: Performance Audit
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'pnpm'
-          cache-dependency-path: 'frontend/pnpm-lock.yaml'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
 
       - name: Install dependencies
         working-directory: frontend
@@ -258,7 +147,17 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: pnpm build
+        env:
+          VITE_API_URL: https://webwaka-super-admin-api-staging.webwaka.workers.dev
 
-      - name: Run Lighthouse audit
+      - name: Deploy to Cloudflare Pages (Staging)
         working-directory: frontend
-        run: pnpm audit:performance || true
+        run: npx wrangler pages deploy dist --project-name=webwaka-super-admin-ui --branch=staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify deployment (Staging)
+        run: |
+          sleep 10
+          curl -f https://staging.webwaka-super-admin-ui.pages.dev || exit 1

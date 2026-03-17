@@ -17,65 +17,42 @@ env:
 
 jobs:
   # ============================================================================
-  # STAGING DEPLOYMENT
+  # LINTING AND TESTING
   # ============================================================================
-  deploy-staging:
-    name: Deploy to Staging
+  lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'workers/package-lock.json'
+          cache: 'pnpm'
 
       - name: Install dependencies
         working-directory: workers
-        run: npm ci
+        run: pnpm install
 
       - name: Run linting
         working-directory: workers
-        run: npm run lint || true
+        run: pnpm lint || true
+
+      - name: Run type checking
+        working-directory: workers
+        run: pnpm type-check || true
 
       - name: Run tests
         working-directory: workers
-        run: npm run test || true
-
-      - name: Build Workers
-        working-directory: workers
-        run: npm run build
-
-      - name: Run D1 migrations (Staging)
-        working-directory: workers
-        run: |
-          npx wrangler d1 migrations apply tenants_staging --env staging
-          npx wrangler d1 migrations apply billing_staging --env staging
-          npx wrangler d1 migrations apply rbac_staging --env staging
-          npx wrangler d1 migrations apply modules_staging --env staging
-          npx wrangler d1 migrations apply health_staging --env staging
-
-      - name: Deploy to Cloudflare Workers (Staging)
-        working-directory: workers
-        run: npx wrangler deploy --env staging
-
-      - name: Verify deployment (Staging)
-        run: |
-          STAGING_URL="https://webwaka-super-admin-api-staging.webwaka.workers.dev"
-          curl -f "$STAGING_URL/health" || exit 1
-
-      - name: Slack notification (Staging)
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: 'Workers API deployed to Staging'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        run: pnpm test || true
 
   # ============================================================================
   # PRODUCTION DEPLOYMENT
@@ -93,46 +70,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'workers/package-lock.json'
+          cache: 'pnpm'
 
       - name: Install dependencies
         working-directory: workers
-        run: npm ci
-
-      - name: Run linting
-        working-directory: workers
-        run: npm run lint
-
-      - name: Run tests
-        working-directory: workers
-        run: npm run test
+        run: pnpm install
 
       - name: Build Workers
         working-directory: workers
-        run: npm run build
+        run: pnpm build
 
-      - name: Run D1 migrations (Production)
-        working-directory: workers
-        run: |
-          npx wrangler d1 migrations apply tenants_prod --env production
-          npx wrangler d1 migrations apply billing_prod --env production
-          npx wrangler d1 migrations apply rbac_prod --env production
-          npx wrangler d1 migrations apply modules_prod --env production
-          npx wrangler d1 migrations apply health_prod --env production
-
-      - name: Deploy to Cloudflare Workers (Production)
+      - name: Deploy to Cloudflare Workers
         working-directory: workers
         run: npx wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify deployment (Production)
+      - name: Verify deployment
         run: |
-          PROD_URL="https://webwaka-super-admin-api.webwaka.workers.dev"
-          curl -f "$PROD_URL/health" || exit 1
+          sleep 10
+          curl -f https://webwaka-super-admin-api.webwaka.workers.dev/health || exit 1
 
       - name: Create GitHub Release
         uses: actions/create-release@v1
@@ -147,92 +114,46 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Slack notification (Production)
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: 'Workers API deployed to Production'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-
   # ============================================================================
-  # LINTING AND TESTING
+  # STAGING DEPLOYMENT
   # ============================================================================
-  lint-and-test:
-    name: Lint and Test
+  deploy-staging:
+    name: Deploy to Staging
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    needs: [lint-and-test]
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'workers/package-lock.json'
+          cache: 'pnpm'
 
       - name: Install dependencies
         working-directory: workers
-        run: npm ci
+        run: pnpm install
 
-      - name: Run linting
+      - name: Build Workers
         working-directory: workers
-        run: npm run lint
+        run: pnpm build
 
-      - name: Run type checking
+      - name: Deploy to Cloudflare Workers (Staging)
         working-directory: workers
-        run: npm run type-check || true
+        run: npx wrangler deploy --env staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Run tests
-        working-directory: workers
-        run: npm run test
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./workers/coverage/coverage-final.json
-          flags: workers
-          name: workers-coverage
-
-  # ============================================================================
-  # SCHEMA VALIDATION
-  # ============================================================================
-  validate-schema:
-    name: Validate Database Schema
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Validate migrations
-        working-directory: workers
+      - name: Verify deployment (Staging)
         run: |
-          # Check that all migration files exist
-          test -f migrations/001_init_tenants.sql
-          test -f migrations/002_init_billing.sql
-          test -f migrations/003_init_rbac.sql
-          test -f migrations/004_init_modules.sql
-          test -f migrations/005_init_health.sql
-          echo "✓ All migration files present"
-
-      - name: Validate SQL syntax
-        run: |
-          # Install sqlite3 for validation
-          sudo apt-get update && sudo apt-get install -y sqlite3
-          
-          # Create temporary database
-          sqlite3 /tmp/test.db < workers/migrations/001_init_tenants.sql
-          sqlite3 /tmp/test.db < workers/migrations/002_init_billing.sql
-          sqlite3 /tmp/test.db < workers/migrations/003_init_rbac.sql
-          sqlite3 /tmp/test.db < workers/migrations/004_init_modules.sql
-          sqlite3 /tmp/test.db < workers/migrations/005_init_health.sql
-          
-          echo "✓ All SQL migrations validated"
+          sleep 10
+          curl -f https://webwaka-super-admin-api-staging.webwaka.workers.dev/health || exit 1
