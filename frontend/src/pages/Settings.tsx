@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { SettingsIcon, Lock, Bell, Eye, Key, Trash2, Copy, Check } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 interface ApiKey {
   id: string;
@@ -31,23 +32,6 @@ interface SystemSetting {
   description: string;
   type: 'text' | 'number' | 'boolean';
 }
-
-const API_KEYS: ApiKey[] = [
-  {
-    id: 'key-1',
-    name: 'Production API Key',
-    key: 'sk_live_51234567890abcdef',
-    created: '2026-01-15',
-    lastUsed: '2 hours ago',
-  },
-  {
-    id: 'key-2',
-    name: 'Development API Key',
-    key: 'sk_test_51234567890abcdef',
-    created: '2026-01-10',
-    lastUsed: '1 day ago',
-  },
-];
 
 const NOTIFICATION_SETTINGS: NotificationSetting[] = [
   {
@@ -142,6 +126,30 @@ export default function Settings() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [settings, setSettings] = useState<SystemSetting[]>(SYSTEM_SETTINGS);
   const [notifications, setNotifications] = useState<NotificationSetting[]>(NOTIFICATION_SETTINGS);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchApiKeys = async () => {
+      try {
+        setLoading(true);
+        const response = await apiClient.get('/settings/api-keys');
+        if (response.success) {
+          setApiKeys(response.data || []);
+        } else {
+          throw new Error('Failed to fetch API keys');
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch API keys';
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchApiKeys();
+  }, []);
 
   const handleCopyKey = (key: string, id: string) => {
     navigator.clipboard.writeText(key);
@@ -171,12 +179,36 @@ export default function Settings() {
     toast.success('System settings saved successfully');
   };
 
-  const handleGenerateKey = () => {
-    toast.success('New API key generated');
+  const handleDeleteKey = async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/settings/api-keys/${id}`);
+      if (response.success) {
+        setApiKeys(apiKeys.filter(key => key.id !== id));
+        toast.success('API key deleted');
+      } else {
+        throw new Error('Failed to delete API key');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete API key';
+      toast.error(errorMessage);
+    }
   };
 
-  const handleDeleteKey = (id: string) => {
-    toast.success('API key deleted');
+  const handleGenerateKey = async () => {
+    try {
+      const response = await apiClient.post('/settings/api-keys', {
+        name: `API Key ${new Date().toLocaleDateString()}`,
+      });
+      if (response.success) {
+        setApiKeys([...apiKeys, response.data]);
+        toast.success('New API key generated');
+      } else {
+        throw new Error('Failed to generate API key');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate API key';
+      toast.error(errorMessage);
+    }
   };
 
   return (
@@ -247,7 +279,21 @@ export default function Settings() {
               <Button onClick={handleGenerateKey}>Generate New Key</Button>
             </div>
 
-            {API_KEYS.map((apiKey) => (
+            {loading ? (
+              <div className="text-center py-8">
+                <p className="text-gray-400">Loading API keys...</p>
+              </div>
+            ) : error ? (
+              <Card className="p-6 border-red-500 bg-red-500/10">
+                <p className="text-red-400">Error: {error}</p>
+              </Card>
+            ) : apiKeys.length === 0 ? (
+              <Card className="p-6">
+                <p className="text-gray-400 text-center">No API keys created yet. Click "Generate New Key" to create one.</p>
+              </Card>
+            ) : null}
+
+            {!loading && apiKeys.map((apiKey) => (
               <Card key={apiKey.id} className="p-4">
                 <div className="space-y-4">
                   <div className="flex items-start justify-between">
