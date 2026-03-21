@@ -10,6 +10,9 @@ import {
   LogOut,
   BarChart3,
   AlertCircle,
+  Handshake,
+  Activity,
+  Rocket,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -38,6 +41,11 @@ export function Sidebar() {
       icon: <Users className="h-5 w-5" />,
     },
     {
+      label: 'Partners',
+      href: '/partners',
+      icon: <Handshake className="h-5 w-5" />,
+    },
+    {
       label: 'Modules',
       href: '/modules',
       icon: <Package className="h-5 w-5" />,
@@ -48,9 +56,19 @@ export function Sidebar() {
       icon: <DollarSign className="h-5 w-5" />,
     },
     {
+      label: 'Operations',
+      href: '/operations',
+      icon: <Activity className="h-5 w-5" />,
+    },
+    {
       label: 'Analytics',
       href: '/analytics',
       icon: <BarChart3 className="h-5 w-5" />,
+    },
+    {
+      label: 'Deployments',
+      href: '/deployments',
+      icon: <Rocket className="h-5 w-5" />,
     },
     {
       label: 'System Health',
@@ -74,7 +92,7 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="font-bold text-lg">WebWaka</h1>
-            <p className="text-xs text-muted-foreground">Super Admin</p>
+            <p className="text-xs text-muted-foreground">Super Admin v2</p>
           </div>
         </div>
       </div>
@@ -88,7 +106,7 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => (
           <button
             key={item.href}

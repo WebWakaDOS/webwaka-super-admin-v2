@@ -21,6 +21,10 @@ import ModuleRegistry from "./pages/ModuleRegistry";
 import SystemHealth from "./pages/SystemHealth";
 import SettingsPage from "./pages/Settings";
 import Analytics from "./pages/Analytics";
+// Phase 4 — New Pages
+import PartnerManagement from "./pages/PartnerManagement";
+import OperationsOverview from "./pages/OperationsOverview";
+import DeploymentManager from "./pages/DeploymentManager";
 
 function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -120,6 +124,43 @@ function AppRouter() {
           <ProtectedRoute requiredPermission="manage:settings">
             <DashboardLayout>
               <SettingsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
+      </Route>
+
+      {/* Phase 4 — New Routes */}
+      <Route path={"/partners"}>
+        {isAuthenticated ? (
+          <ProtectedRoute requiredPermission="manage:partners">
+            <DashboardLayout>
+              <PartnerManagement />
+            </DashboardLayout>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
+      </Route>
+
+      <Route path={"/operations"}>
+        {isAuthenticated ? (
+          <ProtectedRoute requiredPermission="view:operations">
+            <DashboardLayout>
+              <OperationsOverview />
+            </DashboardLayout>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
+      </Route>
+
+      <Route path={"/deployments"}>
+        {isAuthenticated ? (
+          <ProtectedRoute requiredPermission="manage:deployments">
+            <DashboardLayout>
+              <DeploymentManager />
             </DashboardLayout>
           </ProtectedRoute>
         ) : (
