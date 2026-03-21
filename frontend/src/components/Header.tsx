@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Bell, Search, Settings, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -31,6 +32,9 @@ export function Header() {
 
       {/* Right Side Actions */}
       <div className="flex items-center gap-4 ml-auto">
+        {/* Language Switcher */}
+        <LanguageSwitcher />
+
         {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
