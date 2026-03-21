@@ -14,27 +14,27 @@ vars = { ENVIRONMENT = "staging", LOG_LEVEL = "debug", CACHE_TTL = "300" }
 [[env.staging.d1_databases]]
 binding = "TENANTS_DB"
 database_name = "tenants_staging"
-database_id = "f8b4053e-d1cf-4502-a2f7-f4f62615e050"
+database_id = "c0fa3b4f-06cb-4fbc-a641-a7a6dd3ca026"
 
 [[env.staging.d1_databases]]
 binding = "BILLING_DB"
 database_name = "billing_staging"
-database_id = "8a45c543-f16c-4c47-b3cd-a3b2595dfd97"
+database_id = "660716fa-4ecd-452b-843c-0fd0fe6472e5"
 
 [[env.staging.d1_databases]]
 binding = "RBAC_DB"
 database_name = "rbac_staging"
-database_id = "a50afeac-13cc-4c23-8aa4-62cdf3c0fa5f"
+database_id = "9d6ba45a-0d99-4f10-a6d4-7c8b18bdb0ae"
 
 [[env.staging.d1_databases]]
 binding = "MODULES_DB"
 database_name = "modules_staging"
-database_id = "4c2e63b7-62c9-4ea5-92c4-9d58d9a74d87"
+database_id = "ee93377c-8000-45d6-ae54-f0d4c588bf04"
 
 [[env.staging.d1_databases]]
 binding = "HEALTH_DB"
 database_name = "health_staging"
-database_id = "b2aa7c41-60ef-4551-a2e6-96d7e1578390"
+database_id = "a22ca9a2-1581-491f-90b2-826f64601c9d"
 
 # KV Namespace Bindings (Staging)
 [[env.staging.kv_namespaces]]
@@ -64,27 +64,27 @@ vars = { ENVIRONMENT = "production", LOG_LEVEL = "info", CACHE_TTL = "3600" }
 [[env.production.d1_databases]]
 binding = "TENANTS_DB"
 database_name = "tenants_prod"
-database_id = "f8b4053e-d1cf-4502-a2f7-f4f62615e050"
+database_id = "c0fa3b4f-06cb-4fbc-a641-a7a6dd3ca026"
 
 [[env.production.d1_databases]]
 binding = "BILLING_DB"
 database_name = "billing_prod"
-database_id = "8a45c543-f16c-4c47-b3cd-a3b2595dfd97"
+database_id = "660716fa-4ecd-452b-843c-0fd0fe6472e5"
 
 [[env.production.d1_databases]]
 binding = "RBAC_DB"
 database_name = "rbac_prod"
-database_id = "a50afeac-13cc-4c23-8aa4-62cdf3c0fa5f"
+database_id = "9d6ba45a-0d99-4f10-a6d4-7c8b18bdb0ae"
 
 [[env.production.d1_databases]]
 binding = "MODULES_DB"
 database_name = "modules_prod"
-database_id = "4c2e63b7-62c9-4ea5-92c4-9d58d9a74d87"
+database_id = "ee93377c-8000-45d6-ae54-f0d4c588bf04"
 
 [[env.production.d1_databases]]
 binding = "HEALTH_DB"
 database_name = "health_prod"
-database_id = "b2aa7c41-60ef-4551-a2e6-96d7e1578390"
+database_id = "a22ca9a2-1581-491f-90b2-826f64601c9d"
 
 # KV Namespace Bindings (Production - Same namespaces as staging for resource efficiency)
 [[env.production.kv_namespaces]]
