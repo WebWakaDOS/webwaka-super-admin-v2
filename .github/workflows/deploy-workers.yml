@@ -62,6 +62,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     needs: [lint-and-test]
+    permissions:
+      contents: write
     environment:
       name: production
       url: https://webwaka-super-admin-api.webwaka.workers.dev
