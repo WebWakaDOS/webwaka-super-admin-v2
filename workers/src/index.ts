@@ -799,7 +799,7 @@ app.get('/deployments', async (c) => {
     if (environment) { query += ` AND environment = ?`; params.push(environment) }
     query += ` ORDER BY updated_at DESC`
 
-    const result = await c.env.HEALTH_DB.prepare(query).bind(...params).all()
+    const result = await c.env.TENANTS_DB.prepare(query).bind(...params).all()
     return c.json(apiResponse(true, result.results))
   } catch (err) {
     if (err instanceof HTTPException) throw err
@@ -818,7 +818,7 @@ app.get('/deployments/:id', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const id = c.req.param('id')
-    const result = await c.env.HEALTH_DB.prepare(
+    const result = await c.env.TENANTS_DB.prepare(
       `SELECT * FROM deployments WHERE id = ?`
     )
       .bind(id)
@@ -861,13 +861,13 @@ app.put('/deployments/:id/status', async (c) => {
     updates.push('updated_at = CURRENT_TIMESTAMP')
     params.push(id)
 
-    await c.env.HEALTH_DB.prepare(
+    await c.env.TENANTS_DB.prepare(
       `UPDATE deployments SET ${updates.join(', ')} WHERE id = ?`
     )
       .bind(...params)
       .run()
 
-    const updated = await c.env.HEALTH_DB.prepare(`SELECT * FROM deployments WHERE id = ?`)
+    const updated = await c.env.TENANTS_DB.prepare(`SELECT * FROM deployments WHERE id = ?`)
       .bind(id)
       .first()
 
@@ -889,7 +889,7 @@ app.post('/deployments/refresh', async (c) => {
 
     // In production this would call Cloudflare API to get real deployment status
     // For now, we return the current state and mark as refreshed
-    const result = await c.env.HEALTH_DB.prepare(
+    const result = await c.env.TENANTS_DB.prepare(
       `SELECT id, suite, environment, worker_status, pages_status FROM deployments`
     ).all()
 
@@ -936,7 +936,7 @@ app.get('/operations/metrics', async (c) => {
     if (tenantId) { query += ` AND tenant_id = ?`; params.push(tenantId) }
     query += ` ORDER BY metric_date DESC LIMIT 200`
 
-    const result = await c.env.HEALTH_DB.prepare(query).bind(...params).all()
+    const result = await c.env.TENANTS_DB.prepare(query).bind(...params).all()
     return c.json(apiResponse(true, result.results))
   } catch (err) {
     if (err instanceof HTTPException) throw err
@@ -958,7 +958,7 @@ app.get('/operations/summary', async (c) => {
     const cached = await c.env.CACHE_KV.get(cacheKey)
     if (cached) return c.json(apiResponse(true, JSON.parse(cached)))
 
-    const result = await c.env.HEALTH_DB.prepare(
+    const result = await c.env.TENANTS_DB.prepare(
       `SELECT suite,
               SUM(gross_revenue_kobo) as total_revenue_kobo,
               SUM(transaction_count) as total_transactions,
@@ -1017,7 +1017,7 @@ app.post('/operations/metrics', async (c) => {
     }
 
     const id = generateId('om')
-    await c.env.HEALTH_DB.prepare(
+    await c.env.TENANTS_DB.prepare(
       `INSERT OR REPLACE INTO operations_metrics
        (id, tenant_id, suite, metric_date, gross_revenue_kobo, net_revenue_kobo,
         commission_paid_kobo, transaction_count, active_users,
@@ -1054,7 +1054,7 @@ app.get('/operations/ai-usage', async (c) => {
     const hasPermission = await requirePermission(c, 'read:tenants')
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
-    const result = await c.env.HEALTH_DB.prepare(
+    const result = await c.env.TENANTS_DB.prepare(
       `SELECT ai_vendor,
               SUM(ai_tokens_used) as total_tokens,
               SUM(ai_cost_kobo) as total_cost_kobo,
@@ -1093,7 +1093,7 @@ app.get('/ai-quotas/:tenantId', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const tenantId = c.req.param('tenantId')
-    const result = await c.env.HEALTH_DB.prepare(
+    const result = await c.env.TENANTS_DB.prepare(
       `SELECT id, tenant_id, monthly_token_limit, daily_token_limit,
               tokens_used_this_month, tokens_used_today, cost_this_month_kobo,
               active_vendor, last_reset_at, updated_at
@@ -1137,7 +1137,7 @@ app.put('/ai-quotas/:tenantId', async (c) => {
     const { monthly_token_limit, daily_token_limit, active_vendor, byok_key_ref } = await c.req.json()
 
     const id = generateId('aiq')
-    await c.env.HEALTH_DB.prepare(
+    await c.env.TENANTS_DB.prepare(
       `INSERT INTO ai_usage_quotas
        (id, tenant_id, monthly_token_limit, daily_token_limit, active_vendor, byok_key_ref,
         tokens_used_this_month, tokens_used_today, cost_this_month_kobo,
@@ -1160,7 +1160,7 @@ app.put('/ai-quotas/:tenantId', async (c) => {
       )
       .run()
 
-    const updated = await c.env.HEALTH_DB.prepare(
+    const updated = await c.env.TENANTS_DB.prepare(
       `SELECT * FROM ai_usage_quotas WHERE tenant_id = ?`
     )
       .bind(tenantId)
@@ -1186,14 +1186,14 @@ app.post('/ai-quotas/:tenantId/reset', async (c) => {
     const { resetType } = await c.req.json()
 
     if (resetType === 'daily') {
-      await c.env.HEALTH_DB.prepare(
+      await c.env.TENANTS_DB.prepare(
         `UPDATE ai_usage_quotas SET tokens_used_today = 0, updated_at = CURRENT_TIMESTAMP
          WHERE tenant_id = ?`
       )
         .bind(tenantId)
         .run()
     } else if (resetType === 'monthly') {
-      await c.env.HEALTH_DB.prepare(
+      await c.env.TENANTS_DB.prepare(
         `UPDATE ai_usage_quotas
          SET tokens_used_this_month = 0, tokens_used_today = 0, cost_this_month_kobo = 0,
              last_reset_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
