@@ -23,8 +23,44 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { HTTPException } from 'hono/http-exception'
 import bcrypt from 'bcryptjs'
-import { signJWT } from '@webwaka/core'
 import type { Context as HonoContext } from 'hono'
+
+// ============================================================================
+// INLINE JWT SIGNING — replaces @webwaka/core dependency
+// Uses Web Crypto API (available in Cloudflare Workers + modern browsers)
+// ============================================================================
+async function signJWT(
+  payload: Record<string, unknown>,
+  secret: string,
+  expiresInSeconds = 86400
+): Promise<string> {
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const now = Math.floor(Date.now() / 1000)
+  const claims = { ...payload, iat: now, exp: now + expiresInSeconds }
+
+  const encode = (obj: unknown) =>
+    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+
+  const headerB64 = encode(header)
+  const payloadB64 = encode(claims)
+  const signingInput = `${headerB64}.${payloadB64}`
+
+  const keyData = new TextEncoder().encode(secret)
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput))
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+
+  return `${signingInput}.${sigB64}`
+}
 
 // ============================================================================
 // TYPE DEFINITIONS
