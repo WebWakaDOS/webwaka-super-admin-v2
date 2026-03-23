@@ -14,5 +14,11 @@
     "deploy": "pnpm -r deploy",
     "test": "pnpm -r test",
     "format": "pnpm -r format"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6"
   }
 }

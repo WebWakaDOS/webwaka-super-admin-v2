@@ -22,6 +22,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { HTTPException } from 'hono/http-exception'
+import bcrypt from 'bcryptjs'
+import { signJWT } from '@webwaka/core'
 import type { Context as HonoContext } from 'hono'
 
 // ============================================================================
@@ -237,7 +239,7 @@ app.post('/auth/login', async (c) => {
     const { email, password } = await c.req.json()
 
     const result = await c.env.RBAC_DB.prepare(
-      `SELECT u.id, u.email, u.first_name, u.last_name, u.tenant_id, r.name as role
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.tenant_id, u.password_hash, r.name as role
        FROM users u
        LEFT JOIN user_roles ur ON u.id = ur.user_id
        LEFT JOIN roles r ON ur.role_id = r.id
@@ -246,9 +248,16 @@ app.post('/auth/login', async (c) => {
       .bind(email)
       .first()
 
+
     if (!result) {
       throw new HTTPException(401, { message: 'Invalid credentials' })
     }
+
+    const isValidPassword = await bcrypt.compare(password, result.password_hash)
+    if (!isValidPassword) {
+      throw new HTTPException(401, { message: 'Invalid credentials' })
+    }
+
 
     const permissionsResult = await c.env.RBAC_DB.prepare(
       `SELECT p.name FROM role_permissions rp
@@ -259,10 +268,18 @@ app.post('/auth/login', async (c) => {
       .all()
 
     const permissions = permissionsResult.results?.map((r: any) => r.name) || []
-    const token = 'jwt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+
+    const token = await signJWT({
+      sub: result.id,
+      email: result.email,
+      tenantId: result.tenant_id,
+      role: result.role || 'CUSTOMER',
+      permissions
+    }, c.env.JWT_SECRET || 'default-secret-for-dev-only')
 
     await c.env.SESSIONS_KV.put(
-      token,
+      'session:' + token,
+
       JSON.stringify({
         userId: result.id,
         email: result.email,
