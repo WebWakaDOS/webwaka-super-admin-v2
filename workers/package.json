@@ -35,6 +35,7 @@
   "author": "WebWaka Team",
   "license": "MIT",
   "dependencies": {
+    "@webwaka/core": "file:../../webwaka-core",
     "hono": "^4.0.0"
   },
   "devDependencies": {
