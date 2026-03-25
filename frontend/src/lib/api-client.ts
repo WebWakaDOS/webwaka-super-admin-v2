@@ -1,308 +1,354 @@
+/// <reference types="vite/client" />
 /**
- * API Client for Cloudflare Workers Integration
- * Handles all communication with backend services
+ * WebWaka Super Admin — Unified API Client (backwards-compatible facade)
+ * Re-exports from the primary api.ts client with additional types and generic methods.
+ * All pages/hooks should import from this file.
+ *
+ * Base URL resolution order:
+ *   1. VITE_API_URL env var (set in .env.local for local dev → http://localhost:8787)
+ *   2. VITE_FRONTEND_FORGE_API_URL (legacy env var support)
+ *   3. Auto-detection: localhost → local Workers, else deployed Workers
  */
 
-const API_BASE_URL = import.meta.env.VITE_FRONTEND_FORGE_API_URL || 'https://webwaka-super-admin-api.webwaka.workers.dev';
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY || 'dev-key';
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
+function resolveApiBase(): string {
+  if (typeof window === 'undefined') {
+    return 'https://webwaka-super-admin-api.webwaka.workers.dev'
+  }
+  const primary = import.meta.env.VITE_API_URL
+  if (primary) return primary
+  const legacy = import.meta.env.VITE_FRONTEND_FORGE_API_URL
+  if (legacy) return legacy
+  const { hostname } = window.location
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:8787'
+  }
+  return 'https://webwaka-super-admin-api.webwaka.workers.dev'
 }
 
-interface ServiceStatus {
-  name: string;
-  status: 'healthy' | 'degraded' | 'down';
-  uptime: number;
-  responseTime: number;
-  lastChecked: string;
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface ApiResponse<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
+  message?: string
 }
 
-interface SystemMetrics {
-  timestamp: string;
-  cpu: number;
-  memory: number;
-  diskUsage: number;
-  requests: number;
+export interface TenantStats {
+  totalTenants: number
+  activeTenants: number
+  suspendedTenants: number
+  provisioningTenants: number
+  archivedTenants: number
+  totalRevenueKobo: number
+  totalCommissionKobo: number
 }
 
-interface TenantStats {
-  totalTenants: number;
-  activeTenants: number;
-  totalRevenue: number;
-  monthlyRecurring: number;
+export interface ServiceStatus {
+  name: string
+  status: 'HEALTHY' | 'DEGRADED' | 'DOWN'
+  uptime: number
+  responseTime: number
+  lastChecked: string
 }
 
-interface BillingData {
-  totalRevenue: number;
-  activeSubscriptions: number;
-  pendingPayouts: number;
-  commissionEarned: number;
+export interface SystemMetrics {
+  timestamp: string
+  metricName: string
+  metricValue: number
+  unit?: string
 }
+
+export interface BillingData {
+  totalRevenueKobo: number
+  totalCommissionsKobo: number
+  totalPayoutsKobo: number
+  netRevenueKobo: number
+  activeBillingPlans: number
+  periodDays: number
+}
+
+// ── Client ────────────────────────────────────────────────────────────────────
 
 class ApiClient {
-  private baseUrl: string;
-  private apiKey: string;
-  private headers: HeadersInit;
+  private baseUrl: string
 
-  constructor(baseUrl: string = API_BASE_URL, apiKey: string = API_KEY) {
-    this.baseUrl = baseUrl;
-    this.apiKey = apiKey;
-    this.headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    };
+  constructor(baseUrl: string = resolveApiBase()) {
+    this.baseUrl = baseUrl
   }
 
-  private async request<T>(
+  private getToken(): string | null {
+    try {
+      return localStorage.getItem('auth_token')
+    } catch {
+      return null
+    }
+  }
+
+  private getHeaders(): Record<string, string> {
+    const token = this.getToken()
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return headers
+  }
+
+  private async request<T = unknown>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
-      const url = `${this.baseUrl}${endpoint}`;
+      const url = `${this.baseUrl}${endpoint}`
       const response = await fetch(url, {
         ...options,
-        headers: {
-          ...this.headers,
-          ...options.headers,
-        },
-      });
+        headers: { ...this.getHeaders(), ...(options.headers as Record<string, string> || {}) },
+      })
 
       if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
         return {
           success: false,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-        };
+          error: err.errors?.[0] || err.error || err.message || `HTTP ${response.status}`,
+        }
       }
 
-      const data = await response.json();
-      return {
-        success: true,
-        data,
-      };
+      const json = await response.json()
+      // Workers returns { success, data } — unwrap or pass through
+      if (typeof json === 'object' && 'success' in json) {
+        return json as ApiResponse<T>
+      }
+      return { success: true, data: json }
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+      return { success: false, error: error instanceof Error ? error.message : 'Network error' }
     }
   }
 
-  /**
-   * System Health Endpoints
-   */
-
-  async getServiceStatus(): Promise<ApiResponse<ServiceStatus[]>> {
-    return this.request<ServiceStatus[]>('/api/health/services');
+  // ── Generic HTTP methods (used by hooks with direct path like /billing/summary) ──
+  async get<T = unknown>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'GET' })
   }
 
-  async getSystemMetrics(): Promise<ApiResponse<SystemMetrics[]>> {
-    return this.request<SystemMetrics[]>('/api/health/metrics');
-  }
-
-  async getSystemHealth(): Promise<ApiResponse<{
-    status: string;
-    uptime: number;
-    services: ServiceStatus[];
-    metrics: SystemMetrics;
-  }>> {
-    return this.request('/api/health');
-  }
-
-  /**
-   * Tenant Endpoints
-   */
-
-  async getTenantStats(): Promise<ApiResponse<TenantStats>> {
-    return this.request<TenantStats>('/api/tenants/stats');
-  }
-
-  async getTenants(page: number = 1, limit: number = 10): Promise<ApiResponse<{
-    tenants: any[];
-    total: number;
-    page: number;
-    limit: number;
-  }>> {
-    return this.request(`/api/tenants?page=${page}&limit=${limit}`);
-  }
-
-  async getTenant(id: string): Promise<ApiResponse<any>> {
-    return this.request(`/api/tenants/${id}`);
-  }
-
-  async createTenant(data: any): Promise<ApiResponse<any>> {
-    return this.request('/api/tenants', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateTenant(id: string, data: any): Promise<ApiResponse<any>> {
-    return this.request(`/api/tenants/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteTenant(id: string): Promise<ApiResponse<void>> {
-    return this.request(`/api/tenants/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  /**
-   * Billing Endpoints
-   */
-
-  async getBillingData(): Promise<ApiResponse<BillingData>> {
-    return this.request<BillingData>('/api/billing');
-  }
-
-  async getTransactionLedger(page: number = 1, limit: number = 20): Promise<ApiResponse<{
-    transactions: any[];
-    total: number;
-    page: number;
-    limit: number;
-  }>> {
-    return this.request(`/api/billing/ledger?page=${page}&limit=${limit}`);
-  }
-
-  async getCommissionData(): Promise<ApiResponse<{
-    totalCommission: number;
-    pendingCommission: number;
-    paidCommission: number;
-    commissionRate: number;
-  }>> {
-    return this.request('/api/billing/commission');
-  }
-
-  /**
-   * Module Endpoints
-   */
-
-  async getModules(): Promise<ApiResponse<any[]>> {
-    return this.request('/api/modules');
-  }
-
-  async getModule(id: string): Promise<ApiResponse<any>> {
-    return this.request(`/api/modules/${id}`);
-  }
-
-  async getFeatureFlags(): Promise<ApiResponse<any[]>> {
-    return this.request('/api/modules/flags');
-  }
-
-  async updateFeatureFlag(id: string, data: any): Promise<ApiResponse<any>> {
-    return this.request(`/api/modules/flags/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  /**
-   * Settings Endpoints
-   */
-
-  async getSettings(): Promise<ApiResponse<any[]>> {
-    return this.request('/api/settings');
-  }
-
-  async updateSettings(data: any): Promise<ApiResponse<any>> {
-    return this.request('/api/settings', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async getApiKeys(): Promise<ApiResponse<any[]>> {
-    return this.request('/api/settings/api-keys');
-  }
-
-  async createApiKey(name: string): Promise<ApiResponse<any>> {
-    return this.request('/api/settings/api-keys', {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    });
-  }
-
-  async deleteApiKey(id: string): Promise<ApiResponse<void>> {
-    return this.request(`/api/settings/api-keys/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  /**
-   * Generic HTTP Methods — used by pages for direct API calls
-   */
-
-  async get<T = any>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET' });
-  }
-
-  async post<T = any>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
+  async post<T = unknown>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    })
   }
 
-  async put<T = any>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
+  async put<T = unknown>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    })
   }
 
-  async delete<T = any>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+  async delete<T = unknown>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'DELETE' })
   }
 
-  async patch<T = any>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
+  async patch<T = unknown>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PATCH',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    })
   }
 
-  /**
-   * WebSocket for Real-time Updates
-   */
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  async me(): Promise<ApiResponse<{ userId: string; email: string; role: string; permissions: string[] }>> {
+    return this.request('/auth/me', { method: 'GET' })
+  }
 
-  connectWebSocket(endpoint: string, onMessage: (data: any) => void, onError?: (error: Event) => void): WebSocket {
-    const wsUrl = `${this.baseUrl.replace('http', 'ws')}${endpoint}?token=${this.apiKey}`;
-    const ws = new WebSocket(wsUrl);
+  // ── Tenants ───────────────────────────────────────────────────────────────
+  async getTenantStats(): Promise<ApiResponse<TenantStats>> {
+    return this.request<TenantStats>('/tenants/stats', { method: 'GET' })
+  }
 
-    ws.onopen = () => {
-      console.log(`WebSocket connected to ${endpoint}`);
-    };
+  async getTenants(page: number = 1, limit: number = 10): Promise<ApiResponse<{
+    tenants: unknown[]
+    pagination: { page: number; limit: number; total: number }
+  }>> {
+    return this.request(`/tenants?page=${page}&limit=${limit}`, { method: 'GET' })
+  }
+
+  async getTenant(id: string): Promise<ApiResponse<unknown>> {
+    return this.request(`/tenants/${id}`, { method: 'GET' })
+  }
+
+  async createTenant(data: unknown): Promise<ApiResponse<unknown>> {
+    return this.request('/tenants', { method: 'POST', body: JSON.stringify(data) })
+  }
+
+  async updateTenant(id: string, data: unknown): Promise<ApiResponse<unknown>> {
+    return this.request(`/tenants/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+  }
+
+  async deleteTenant(id: string): Promise<ApiResponse<void>> {
+    return this.request(`/tenants/${id}`, { method: 'DELETE' })
+  }
+
+  // ── Billing ───────────────────────────────────────────────────────────────
+  async getBillingMetrics(): Promise<ApiResponse<BillingData>> {
+    return this.request<BillingData>('/billing/metrics', { method: 'GET' })
+  }
+
+  async getBillingLedger(limit = 50, offset = 0): Promise<ApiResponse<unknown>> {
+    return this.request(`/billing/ledger?limit=${limit}&offset=${offset}`, { method: 'GET' })
+  }
+
+  async getBillingSummary(): Promise<ApiResponse<unknown>> {
+    return this.request('/billing/summary', { method: 'GET' })
+  }
+
+  async getCommissions(page = 1, limit = 20): Promise<ApiResponse<unknown>> {
+    return this.request(`/billing/commissions?page=${page}&limit=${limit}`, { method: 'GET' })
+  }
+
+  // ── Modules ───────────────────────────────────────────────────────────────
+  async getModules(): Promise<ApiResponse<unknown[]>> {
+    return this.request('/modules', { method: 'GET' })
+  }
+
+  async getModulesForTenant(tenantId: string): Promise<ApiResponse<unknown[]>> {
+    return this.request(`/modules/${tenantId}`, { method: 'GET' })
+  }
+
+  async updateTenantModule(tenantId: string, moduleId: string, enabled: boolean): Promise<ApiResponse<unknown>> {
+    return this.request(`/modules/${tenantId}/${moduleId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    })
+  }
+
+  // ── Health ────────────────────────────────────────────────────────────────
+  async getHealthStatus(): Promise<ApiResponse<unknown>> {
+    return this.request('/health/status', { method: 'GET' })
+  }
+
+  async getHealthServices(): Promise<ApiResponse<ServiceStatus[]>> {
+    return this.request('/health/services', { method: 'GET' })
+  }
+
+  async getHealthMetrics(hours = 24): Promise<ApiResponse<SystemMetrics[]>> {
+    return this.request(`/health/metrics?hours=${hours}`, { method: 'GET' })
+  }
+
+  async getHealthAlerts(resolved?: boolean): Promise<ApiResponse<unknown[]>> {
+    const qs = resolved !== undefined ? `?resolved=${resolved}` : ''
+    return this.request(`/health/alerts${qs}`, { method: 'GET' })
+  }
+
+  async runHealthCheck(): Promise<ApiResponse<unknown>> {
+    return this.request('/health/check', { method: 'POST' })
+  }
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  async getSettings(): Promise<ApiResponse<unknown>> {
+    return this.request('/settings', { method: 'GET' })
+  }
+
+  async updateSettings(data: unknown): Promise<ApiResponse<unknown>> {
+    return this.request('/settings', { method: 'PUT', body: JSON.stringify(data) })
+  }
+
+  async getApiKeys(): Promise<ApiResponse<unknown[]>> {
+    return this.request('/settings/api-keys', { method: 'GET' })
+  }
+
+  async createApiKey(name: string): Promise<ApiResponse<unknown>> {
+    return this.request('/settings/api-keys', { method: 'POST', body: JSON.stringify({ name }) })
+  }
+
+  async deleteApiKey(id: string): Promise<ApiResponse<void>> {
+    return this.request(`/settings/api-keys/${id}`, { method: 'DELETE' })
+  }
+
+  async getAuditLog(page = 1, limit = 50): Promise<ApiResponse<unknown>> {
+    return this.request(`/settings/audit-log?page=${page}&limit=${limit}`, { method: 'GET' })
+  }
+
+  // ── Partners ──────────────────────────────────────────────────────────────
+  async getPartners(page = 1, limit = 20): Promise<ApiResponse<unknown>> {
+    return this.request(`/partners?page=${page}&limit=${limit}`, { method: 'GET' })
+  }
+
+  async createPartner(data: unknown): Promise<ApiResponse<unknown>> {
+    return this.request('/partners', { method: 'POST', body: JSON.stringify(data) })
+  }
+
+  async updatePartner(id: string, data: unknown): Promise<ApiResponse<unknown>> {
+    return this.request(`/partners/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+  }
+
+  async deletePartner(id: string): Promise<ApiResponse<void>> {
+    return this.request(`/partners/${id}`, { method: 'DELETE' })
+  }
+
+  async assignPartnerSuite(partnerId: string, data: unknown): Promise<ApiResponse<unknown>> {
+    return this.request(`/partners/${partnerId}/suites`, { method: 'POST', body: JSON.stringify(data) })
+  }
+
+  // ── Deployments ───────────────────────────────────────────────────────────
+  async getDeployments(page = 1): Promise<ApiResponse<unknown>> {
+    return this.request(`/deployments?page=${page}`, { method: 'GET' })
+  }
+
+  async updateDeploymentStatus(id: string, status: string): Promise<ApiResponse<unknown>> {
+    return this.request(`/deployments/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) })
+  }
+
+  async refreshDeployments(): Promise<ApiResponse<unknown>> {
+    return this.request('/deployments/refresh', { method: 'POST' })
+  }
+
+  // ── Operations ────────────────────────────────────────────────────────────
+  async getOperationsMetrics(tenantId?: string): Promise<ApiResponse<unknown>> {
+    return this.request(`/operations/metrics${tenantId ? `?tenant_id=${tenantId}` : ''}`, { method: 'GET' })
+  }
+
+  async getOperationsSummary(): Promise<ApiResponse<unknown>> {
+    return this.request('/operations/summary', { method: 'GET' })
+  }
+
+  async getAIUsage(): Promise<ApiResponse<unknown>> {
+    return this.request('/operations/ai-usage', { method: 'GET' })
+  }
+
+  // ── AI Quotas ─────────────────────────────────────────────────────────────
+  async getAIQuotas(tenantId: string): Promise<ApiResponse<unknown>> {
+    return this.request(`/ai-quotas/${tenantId}`, { method: 'GET' })
+  }
+
+  async updateAIQuotas(tenantId: string, data: unknown): Promise<ApiResponse<unknown>> {
+    return this.request(`/ai-quotas/${tenantId}`, { method: 'PUT', body: JSON.stringify(data) })
+  }
+
+  async resetAIQuotas(tenantId: string, resetType: 'daily' | 'monthly'): Promise<ApiResponse<unknown>> {
+    return this.request(`/ai-quotas/${tenantId}/reset`, { method: 'POST', body: JSON.stringify({ resetType }) })
+  }
+
+  // ── WebSocket ─────────────────────────────────────────────────────────────
+  connectWebSocket(endpoint: string, onMessage: (data: unknown) => void, onError?: (error: Event) => void): WebSocket {
+    // Convert http(s) to ws(s) correctly
+    const wsUrl = this.baseUrl
+      .replace(/^https:\/\//, 'wss://')
+      .replace(/^http:\/\//, 'ws://')
+    const ws = new WebSocket(`${wsUrl}${endpoint}`)
 
     ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
-        onMessage(data);
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+        onMessage(JSON.parse(event.data))
+      } catch {
+        console.error('Failed to parse WebSocket message:', event.data)
       }
-    };
+    }
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      if (onError) onError(error);
-    };
+      console.error('WebSocket error on', endpoint, error)
+      if (onError) onError(error)
+    }
 
-    ws.onclose = () => {
-      console.log(`WebSocket disconnected from ${endpoint}`);
-    };
-
-    return ws;
+    return ws
   }
 }
 
-// Export singleton instance
-export const apiClient = new ApiClient();
-
-// Export types
-export type { ApiResponse, ServiceStatus, SystemMetrics, TenantStats, BillingData };
+export const apiClient = new ApiClient()
+export type { ApiClient }

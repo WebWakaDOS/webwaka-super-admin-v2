@@ -7,8 +7,8 @@ import { Mail, Lock, Loader2 } from 'lucide-react';
 export default function Login() {
   const { login, isLoading } = useAuth();
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState('admin@webwaka.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -78,12 +78,13 @@ export default function Login() {
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400 pointer-events-none" />
                   <input
                     type="email"
-                    placeholder="admin@example.com"
+                    placeholder="Enter your work email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyPress={handleKeyPress}
                     className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 text-white placeholder:text-slate-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled={isSubmitting || isLoading}
+                    autoComplete="email"
                   />
                 </div>
               </div>
@@ -124,12 +125,12 @@ export default function Login() {
                 )}
               </button>
 
-              {/* Demo Credentials */}
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-300">
-                <p className="font-medium mb-1">Demo Credentials:</p>
-                <p>Email: admin@webwaka.com</p>
-                <p>Password: password</p>
-              </div>
+              {/* Admin contact helper */}
+              <p className="text-center text-slate-400 text-xs pt-1">
+                Don&apos;t have access?{' '}
+                <span className="text-slate-300">Contact your administrator.</span>
+              </p>
+
             </div>
           </CardContent>
         </Card>
