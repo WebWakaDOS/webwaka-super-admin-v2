@@ -12,7 +12,8 @@
     "deployments": "Deployments",
     "health": "System Health",
     "settings": "Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "auditLog": "Audit Log"
   },
   "common": {
     "loading": "Loading...",

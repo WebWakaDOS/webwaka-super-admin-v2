@@ -1,6 +1,7 @@
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   LayoutDashboard,
   Users,
@@ -29,60 +30,61 @@ export function Sidebar() {
   const [location, navigate] = useLocation();
   const { logout, user } = useAuth();
   const { currentTenant } = useTenant();
+  const { t } = useTranslation();
 
   const navItems: NavItem[] = [
     {
-      label: 'Dashboard',
+      label: t('nav.dashboard'),
       href: '/',
       icon: <LayoutDashboard className="h-5 w-5" />,
     },
     {
-      label: 'Tenants',
+      label: t('nav.tenants'),
       href: '/tenants',
       icon: <Users className="h-5 w-5" />,
     },
     {
-      label: 'Partners',
+      label: t('nav.partners'),
       href: '/partners',
       icon: <Handshake className="h-5 w-5" />,
     },
     {
-      label: 'Modules',
+      label: t('nav.modules'),
       href: '/modules',
       icon: <Package className="h-5 w-5" />,
     },
     {
-      label: 'Billing',
+      label: t('nav.billing'),
       href: '/billing',
       icon: <DollarSign className="h-5 w-5" />,
     },
     {
-      label: 'Operations',
+      label: t('nav.operations'),
       href: '/operations',
       icon: <Activity className="h-5 w-5" />,
     },
     {
-      label: 'Analytics',
+      label: t('nav.analytics'),
       href: '/analytics',
       icon: <BarChart3 className="h-5 w-5" />,
     },
     {
-      label: 'Deployments',
+      label: t('nav.deployments'),
       href: '/deployments',
       icon: <Rocket className="h-5 w-5" />,
     },
     {
-      label: 'System Health',
+      label: t('nav.health'),
       href: '/health',
       icon: <AlertCircle className="h-5 w-5" />,
     },
     {
-      label: 'Settings',
+      label: t('nav.settings'),
       href: '/settings',
       icon: <Settings className="h-5 w-5" />,
     },
     {
-      label: 'Audit Log',
+      label: t('nav.auditLog'),
       href: '/audit-log',
       icon: <ClipboardList className="h-5 w-5" />,
       requiredRole: 'super_admin',

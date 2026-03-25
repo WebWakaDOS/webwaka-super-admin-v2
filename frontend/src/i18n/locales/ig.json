@@ -12,7 +12,8 @@
     "deployments": "Ntinye",
     "health": "Ahụike Sistemu",
     "settings": "Ntọala",
-    "logout": "Pụọ"
+    "logout": "Pụọ",
+    "auditLog": "Ndekọ Omume"
   },
   "common": {
     "loading": "Na-ebugharị...",
