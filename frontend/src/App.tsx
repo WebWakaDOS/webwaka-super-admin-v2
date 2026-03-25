@@ -8,19 +8,21 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { TenantProvider } from "./contexts/TenantContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardLayout } from "./components/DashboardLayout";
+import { OfflineBanner } from "./components/OfflineBanner";
 
 // Pages
 import Login from "./pages/Login";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
-import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import TenantManagement from "./pages/TenantManagement";
+import TenantProvisioning from "./pages/TenantProvisioning";
 import Billing from "./pages/Billing";
 import ModuleRegistry from "./pages/ModuleRegistry";
 import SystemHealth from "./pages/SystemHealth";
 import SettingsPage from "./pages/Settings";
 import Analytics from "./pages/Analytics";
+import AuditLog from "./pages/AuditLog";
 // Phase 4 — New Pages
 import PartnerManagement from "./pages/PartnerManagement";
 import OperationsOverview from "./pages/OperationsOverview";
@@ -64,6 +66,18 @@ function AppRouter() {
           <ProtectedRoute requiredPermission="manage:tenants">
             <DashboardLayout>
               <TenantManagement />
+            </DashboardLayout>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
+      </Route>
+
+      <Route path={"/tenant-provisioning"}>
+        {isAuthenticated ? (
+          <ProtectedRoute requiredPermission="manage:tenants">
+            <DashboardLayout>
+              <TenantProvisioning />
             </DashboardLayout>
           </ProtectedRoute>
         ) : (
@@ -168,6 +182,19 @@ function AppRouter() {
         )}
       </Route>
 
+      {/* Audit Log */}
+      <Route path={"/audit-log"}>
+        {isAuthenticated ? (
+          <ProtectedRoute requiredPermission="manage:settings">
+            <DashboardLayout>
+              <AuditLog />
+            </DashboardLayout>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
+      </Route>
+
       {/* 404 */}
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
@@ -184,6 +211,7 @@ function App() {
             <Router hook={useHashLocation}>
               <TooltipProvider>
                 <Toaster />
+                <OfflineBanner />
                 <AppRouter />
               </TooltipProvider>
             </Router>
