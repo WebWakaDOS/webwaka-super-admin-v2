@@ -1,6 +1,7 @@
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   LayoutDashboard,
   Users,
@@ -13,6 +14,8 @@ import {
   Handshake,
   Activity,
   Rocket,
+  ClipboardList,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -24,68 +27,89 @@ interface NavItem {
   requiredRole?: string;
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [location, navigate] = useLocation();
   const { logout, user } = useAuth();
   const { currentTenant } = useTenant();
+  const { t } = useTranslation();
 
   const navItems: NavItem[] = [
     {
-      label: 'Dashboard',
+      label: t('nav.dashboard'),
       href: '/',
       icon: <LayoutDashboard className="h-5 w-5" />,
     },
     {
-      label: 'Tenants',
+      label: t('nav.tenants'),
       href: '/tenants',
       icon: <Users className="h-5 w-5" />,
     },
     {
-      label: 'Partners',
+      label: t('nav.partners'),
       href: '/partners',
       icon: <Handshake className="h-5 w-5" />,
     },
     {
-      label: 'Modules',
+      label: t('nav.modules'),
       href: '/modules',
       icon: <Package className="h-5 w-5" />,
     },
     {
-      label: 'Billing',
+      label: t('nav.billing'),
       href: '/billing',
       icon: <DollarSign className="h-5 w-5" />,
     },
     {
-      label: 'Operations',
+      label: t('nav.operations'),
       href: '/operations',
       icon: <Activity className="h-5 w-5" />,
     },
     {
-      label: 'Analytics',
+      label: t('nav.analytics'),
       href: '/analytics',
       icon: <BarChart3 className="h-5 w-5" />,
     },
     {
-      label: 'Deployments',
+      label: t('nav.deployments'),
       href: '/deployments',
       icon: <Rocket className="h-5 w-5" />,
     },
     {
-      label: 'System Health',
+      label: t('nav.health'),
       href: '/health',
       icon: <AlertCircle className="h-5 w-5" />,
     },
     {
-      label: 'Settings',
+      label: t('nav.settings'),
       href: '/settings',
       icon: <Settings className="h-5 w-5" />,
+    },
+    {
+      label: t('nav.auditLog'),
+      href: '/audit-log',
+      icon: <ClipboardList className="h-5 w-5" />,
+      requiredRole: 'super_admin',
     },
   ];
 
   return (
-    <aside className="w-64 bg-card border-r border-border flex flex-col h-screen">
-      {/* Logo */}
-      <div className="p-6 border-b border-border">
+    <aside
+      className={cn(
+        'w-64 bg-card border-r border-border flex flex-col h-screen z-30 transition-transform duration-200',
+        // Desktop: always visible
+        'lg:relative lg:translate-x-0 lg:flex',
+        // Mobile: fixed drawer, slide in/out
+        'fixed inset-y-0 left-0',
+        isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      )}
+    >
+      {/* Logo + mobile close button */}
+      <div className="p-6 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-lg">W</span>
@@ -95,6 +119,16 @@ export function Sidebar() {
             <p className="text-xs text-muted-foreground">Super Admin v2</p>
           </div>
         </div>
+        {/* Close button — mobile only */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1 rounded hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label="Close navigation menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Current Tenant */}
@@ -106,22 +140,25 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <button
-            key={item.href}
-            onClick={() => navigate(item.href)}
-            className={cn(
-              'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-              location === item.href
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            )}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </button>
-        ))}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Main navigation">
+        {navItems
+          .filter((item) => !item.requiredRole || user?.role === item.requiredRole)
+          .map((item) => (
+            <button
+              key={item.href}
+              onClick={() => { navigate(item.href); onClose?.() }}
+              aria-current={location === item.href ? 'page' : undefined}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                location === item.href
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
       </nav>
 
       {/* User Profile & Logout */}
