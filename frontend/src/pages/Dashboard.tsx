@@ -4,6 +4,7 @@ import { useTenant } from '@/contexts/TenantContext'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle } from 'lucide-react'
+import { useTranslation } from '@/hooks/useTranslation'
 import {
   BarChart,
   Bar,
@@ -22,6 +23,7 @@ import {
 import { Users, DollarSign, Package, TrendingUp, Activity } from 'lucide-react'
 
 export default function Dashboard() {
+  const { t } = useTranslation()
   const { tenants } = useTenant()
   const { metrics, revenueData, tenantDistribution, activityData, recentActivity, loading, error } =
     useDashboardData()
@@ -30,9 +32,9 @@ export default function Dashboard() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('dashboard.title')}</h1>
           <p className="text-muted-foreground mt-2">
-            Welcome to WebWaka Super Admin. Monitor your platform performance and manage tenants.
+            {t('dashboard.subtitle')}
           </p>
         </div>
 
@@ -52,13 +54,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          Welcome to WebWaka Super Admin. Monitor your platform performance and manage tenants.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('dashboard.title')}</h1>
+        <p className="text-muted-foreground mt-2">{t('dashboard.subtitle')}</p>
       </div>
 
       {/* Key Metrics */}

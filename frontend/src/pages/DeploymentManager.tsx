@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from '@/hooks/useTranslation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -114,6 +115,7 @@ const SUITE_COLORS: Record<string, string> = {
 // ============================================================================
 
 export default function DeploymentManager() {
+  const { t } = useTranslation()
   const [deployments, setDeployments] = useState<Deployment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -156,13 +158,12 @@ export default function DeploymentManager() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Deployment Manager</h1>
-          <p className="text-muted-foreground mt-1">
-            Monitor Cloudflare Workers + Pages deployments across all suites
+          <h1 className="text-3xl font-bold tracking-tight">{t('deployments.title')}</h1>
+          <p className="text-muted-foreground mt-1">{t('deployments.subtitle')}
           </p>
         </div>
         <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>

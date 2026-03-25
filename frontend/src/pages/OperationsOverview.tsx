@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { useTranslation } from '@/hooks/useTranslation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -99,6 +100,7 @@ const AI_VENDOR_COLORS: Record<string, string> = {
 // ============================================================================
 
 export default function OperationsOverview() {
+  const { t } = useTranslation()
   const [summary, setSummary] = useState<OperationsSummary | null>(null)
   const [aiUsage, setAIUsage] = useState<AIVendorBreakdown[]>([])
   const [loading, setLoading] = useState(true)
@@ -178,13 +180,12 @@ export default function OperationsOverview() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Operations Overview</h1>
-          <p className="text-muted-foreground mt-1">
-            Cross-suite analytics — revenue, health, AI usage (last 30 days)
+          <h1 className="text-3xl font-bold tracking-tight">{t('operations.title')}</h1>
+          <p className="text-muted-foreground mt-1">{t('operations.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-3">

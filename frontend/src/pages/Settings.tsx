@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -123,6 +124,7 @@ const AUDIT_LOGS = [
 ];
 
 export default function Settings() {
+  const { t } = useTranslation();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [settings, setSettings] = useState<SystemSetting[]>(SYSTEM_SETTINGS);
   const [notifications, setNotifications] = useState<NotificationSetting[]>(NOTIFICATION_SETTINGS);
@@ -136,7 +138,7 @@ export default function Settings() {
         setLoading(true);
         const response = await apiClient.get('/settings/api-keys');
         if (response.success) {
-          setApiKeys(response.data || []);
+          setApiKeys((response.data as ApiKey[]) || []);
         } else {
           throw new Error('Failed to fetch API keys');
         }
@@ -200,7 +202,7 @@ export default function Settings() {
         name: `API Key ${new Date().toLocaleDateString()}`,
       });
       if (response.success) {
-        setApiKeys([...apiKeys, response.data]);
+        setApiKeys([...apiKeys, response.data as ApiKey]);
         toast.success('New API key generated');
       } else {
         throw new Error('Failed to generate API key');
@@ -212,10 +214,10 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
+        <h1 className="text-3xl font-bold">{t('settings.title')}</h1>
         <p className="text-gray-400 mt-1">Configure system settings, API keys, and notifications</p>
       </div>
 
