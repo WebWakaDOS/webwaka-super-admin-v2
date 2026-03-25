@@ -23,8 +23,8 @@ export function useHealthData(autoRefresh: boolean = true, refreshInterval: numb
   const fetchHealthData = async () => {
     try {
       const [servicesRes, metricsRes] = await Promise.all([
-        apiClient.getServiceStatus(),
-        apiClient.getSystemMetrics(),
+        apiClient.getHealthServices(),
+        apiClient.getHealthMetrics(),
       ]);
 
       if (servicesRes.success && metricsRes.success) {
@@ -55,16 +55,17 @@ export function useHealthData(autoRefresh: boolean = true, refreshInterval: numb
     try {
       wsRef.current = apiClient.connectWebSocket(
         '/ws/health',
-        (message) => {
+        (rawMessage) => {
+          const message = rawMessage as { type: string; data: unknown }
           if (message.type === 'service_status') {
             setData((prev) => ({
               ...prev,
-              services: message.data,
+              services: (message.data as ServiceStatus[]) || prev.services,
             }));
           } else if (message.type === 'metrics') {
             setData((prev) => ({
               ...prev,
-              metrics: [...prev.metrics.slice(-59), message.data],
+              metrics: [...prev.metrics.slice(-59), message.data as SystemMetrics],
             }));
           }
         },

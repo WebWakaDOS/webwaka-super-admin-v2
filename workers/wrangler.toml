@@ -55,53 +55,68 @@ id = "4b5552f38e8b4db89e696d23129745d3"
 
 # ============================================================================
 # ENVIRONMENT: Production
+#
+# IMPORTANT: Production databases are SEPARATE from staging to prevent data
+# contamination. Replace the TODO UUIDs below with real production D1 database
+# IDs created via:
+#   wrangler d1 create tenants_prod
+#   wrangler d1 create billing_prod
+#   wrangler d1 create rbac_prod
+#   wrangler d1 create modules_prod
+#   wrangler d1 create health_prod
+#
+# Then apply migrations:
+#   wrangler d1 migrations apply tenants_prod --env production
+#   wrangler d1 migrations apply billing_prod --env production
+#   wrangler d1 migrations apply rbac_prod --env production
 # ============================================================================
 [env.production]
 name = "webwaka-super-admin-api-prod"
 vars = { ENVIRONMENT = "production", LOG_LEVEL = "info", CACHE_TTL = "3600" }
 
-# D1 Database Bindings (Production - Same as Staging for resource efficiency)
+# D1 Database Bindings (Production — DISTINCT from staging; replace TODOs with real IDs)
 [[env.production.d1_databases]]
 binding = "TENANTS_DB"
 database_name = "tenants_prod"
-database_id = "c0fa3b4f-06cb-4fbc-a641-a7a6dd3ca026"
+database_id = "TODO_REPLACE_WITH_PROD_TENANTS_D1_UUID"
 
 [[env.production.d1_databases]]
 binding = "BILLING_DB"
 database_name = "billing_prod"
-database_id = "660716fa-4ecd-452b-843c-0fd0fe6472e5"
+database_id = "TODO_REPLACE_WITH_PROD_BILLING_D1_UUID"
 
 [[env.production.d1_databases]]
 binding = "RBAC_DB"
 database_name = "rbac_prod"
-database_id = "9d6ba45a-0d99-4f10-a6d4-7c8b18bdb0ae"
+database_id = "TODO_REPLACE_WITH_PROD_RBAC_D1_UUID"
 
 [[env.production.d1_databases]]
 binding = "MODULES_DB"
 database_name = "modules_prod"
-database_id = "ee93377c-8000-45d6-ae54-f0d4c588bf04"
+database_id = "TODO_REPLACE_WITH_PROD_MODULES_D1_UUID"
 
 [[env.production.d1_databases]]
 binding = "HEALTH_DB"
 database_name = "health_prod"
-database_id = "a22ca9a2-1581-491f-90b2-826f64601c9d"
+database_id = "TODO_REPLACE_WITH_PROD_HEALTH_D1_UUID"
 
-# KV Namespace Bindings (Production - Same namespaces as staging for resource efficiency)
+# KV Namespace Bindings (Production — DISTINCT from staging to prevent session/cache leakage)
+# Create via: wrangler kv:namespace create SESSIONS_KV --env production
 [[env.production.kv_namespaces]]
 binding = "SESSIONS_KV"
-id = "3f66df9f1b2f4051a39f2a4b2b02d348"
+id = "TODO_REPLACE_WITH_PROD_SESSIONS_KV_ID"
 
 [[env.production.kv_namespaces]]
 binding = "FEATURE_FLAGS_KV"
-id = "d757ffe29c7c4c55adad5dcf5163104d"
+id = "TODO_REPLACE_WITH_PROD_FEATURE_FLAGS_KV_ID"
 
 [[env.production.kv_namespaces]]
 binding = "CACHE_KV"
-id = "ff1f220b15364b2995732ac05482c3ef"
+id = "TODO_REPLACE_WITH_PROD_CACHE_KV_ID"
 
 [[env.production.kv_namespaces]]
 binding = "NOTIFICATIONS_KV"
-id = "4b5552f38e8b4db89e696d23129745d3"
+id = "TODO_REPLACE_WITH_PROD_NOTIFICATIONS_KV_ID"
 
 # ============================================================================
 # Build Configuration

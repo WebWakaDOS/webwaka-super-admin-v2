@@ -13,6 +13,7 @@ import {
   Handshake,
   Activity,
   Rocket,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -80,6 +81,12 @@ export function Sidebar() {
       href: '/settings',
       icon: <Settings className="h-5 w-5" />,
     },
+    {
+      label: 'Audit Log',
+      href: '/audit-log',
+      icon: <ClipboardList className="h-5 w-5" />,
+      requiredRole: 'super_admin',
+    },
   ];
 
   return (
@@ -106,22 +113,25 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <button
-            key={item.href}
-            onClick={() => navigate(item.href)}
-            className={cn(
-              'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-              location === item.href
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            )}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </button>
-        ))}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Main navigation">
+        {navItems
+          .filter((item) => !item.requiredRole || user?.role === item.requiredRole)
+          .map((item) => (
+            <button
+              key={item.href}
+              onClick={() => navigate(item.href)}
+              aria-current={location === item.href ? 'page' : undefined}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                location === item.href
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
       </nav>
 
       {/* User Profile & Logout */}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // Types
 export type UserRole = 'super_admin' | 'partner' | 'support' | 'tenant_admin';
@@ -38,7 +38,6 @@ function getAPIBase() {
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   return isLocalhost ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev';
 }
-const API_BASE = getAPIBase();
 
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -46,23 +45,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize auth from localStorage
+  // Initialize auth from localStorage — validate token against /auth/me
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
 
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Failed to restore auth state:', error);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-      }
+    if (!storedToken) {
+      setIsLoading(false);
+      return;
     }
 
-    setIsLoading(false);
+    // Validate token server-side — do not trust localStorage blindly
+    const validateToken = async () => {
+      try {
+        const apiBase = getAPIBase();
+        const response = await fetch(`${apiBase}/auth/me`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+
+        if (response.ok) {
+          // Token is valid — restore session
+          const data = await response.json();
+          const restoredUser: User = storedUser
+            ? JSON.parse(storedUser)
+            : {
+                id: data.data?.userId || 'unknown',
+                email: data.data?.email || '',
+                name: data.data?.email || 'Admin',
+                role: (data.data?.role === 'SUPERADMIN' ? 'super_admin' : data.data?.role) as UserRole,
+                permissions: data.data?.permissions || [],
+                createdAt: new Date().toISOString(),
+              };
+          setToken(storedToken);
+          setUser(restoredUser);
+        } else {
+          // Token is expired or invalid — clear storage
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+        }
+      } catch {
+        // Network error — restore from storage optimistically (offline support)
+        if (storedUser) {
+          try {
+            setToken(storedToken);
+            setUser(JSON.parse(storedUser));
+          } catch {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+          }
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    validateToken();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -79,23 +116,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Login failed');
       }
 
-      const data = await response.json();
-      
+      const json = await response.json();
+
+      // Workers wraps responses in { success, data: { token, user } }
+      const payload = json.data || json;
+      const rawUser = payload.user || {};
+      const token = payload.token;
+
+      if (!token) throw new Error('No token received from server');
+
       // Use actual user data from API response
       const user: User = {
-        id: data.user.id || 'user_001',
-        email: data.user.email || email,
-        name: data.user.name || 'Admin User',
-        role: (data.user.role === 'super-admin' ? 'super_admin' : data.user.role) as UserRole,
-        permissions: data.user.permissions || [],
-        avatar: data.user.avatar,
-        createdAt: data.user.createdAt || new Date().toISOString(),
+        id: rawUser.id || 'user_001',
+        email: rawUser.email || email,
+        name: rawUser.name || rawUser.email || 'Admin User',
+        role: (rawUser.role === 'super-admin' || rawUser.role === 'SUPERADMIN'
+          ? 'super_admin'
+          : rawUser.role || 'super_admin') as UserRole,
+        permissions: rawUser.permissions || [],
+        avatar: rawUser.avatar,
+        tenantId: rawUser.tenantId,
+        createdAt: rawUser.createdAt || new Date().toISOString(),
         lastLogin: new Date().toISOString(),
       };
 
       setUser(user);
-      setToken(data.token);
-      localStorage.setItem('auth_token', data.token);
+      setToken(token);
+      localStorage.setItem('auth_token', token);
       localStorage.setItem('auth_user', JSON.stringify(user));
     } catch (error) {
       console.error('Login error:', error);

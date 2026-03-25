@@ -7,8 +7,8 @@ import { Mail, Lock, Loader2 } from 'lucide-react';
 export default function Login() {
   const { login, isLoading } = useAuth();
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState('admin@webwaka.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -124,12 +124,6 @@ export default function Login() {
                 )}
               </button>
 
-              {/* Demo Credentials */}
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-300">
-                <p className="font-medium mb-1">Demo Credentials:</p>
-                <p>Email: admin@webwaka.com</p>
-                <p>Password: password</p>
-              </div>
             </div>
           </CardContent>
         </Card>

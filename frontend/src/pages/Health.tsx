@@ -44,7 +44,7 @@ export default function Health() {
           throw new Error('Failed to fetch health status')
         }
 
-        const healthData = healthResponse.data || {}
+        const healthData: any = healthResponse.data || {}
         setServices(healthData.services || [])
         setMetrics(healthData.metrics || null)
         setLoading(false)

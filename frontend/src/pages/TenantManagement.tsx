@@ -53,7 +53,7 @@ export default function TenantManagement() {
           throw new Error('Failed to fetch tenants')
         }
 
-        const tenantsData = response.data || []
+        const tenantsData = ((response.data as any)?.tenants || response.data || []) as Tenant[]
         setTenants(tenantsData)
         setFilteredTenants(tenantsData)
       } catch (err) {
