@@ -214,12 +214,55 @@ Updated in this session: three-component mobile drawer pattern.
 - Backdrop overlay (`bg-black/50`) dismisses sidebar on click outside
 - All interactive elements have proper `aria-label` attributes
 
-## Phase 4 Additions — Pagination
+## Phase 4 Additions — Performance + Features (PR #10) ✅
 
-Client-side pagination (page size: 10) added to `TenantManagement` and `PartnerManagement`:
-- State: `currentPage` resets to 1 on search/filter change
-- Display: `"Showing X–Y of Z"` count + Previous/Next buttons
-- Controls hidden when `totalPages === 1` (no empty pagination chrome)
+**Build:** 2341 modules, 0 errors.
+
+### Virtual Scroll — TenantManagement
+- `@tanstack/react-virtual` `useVirtualizer` with `ROW_HEIGHT=56`, `overscan=10`
+- Absolute-positioned virtual rows inside a fixed-height scroll container (max 560px)
+- Server-side pagination: fetches `/tenants?page=N&limit=50` from API; resets on search
+
+### Bulk Actions — TenantManagement
+- Per-row checkbox (Square/CheckSquare) + select-all header toggle
+- **Suspend**: PATCH all selected → `{ status: 'suspended' }` via `Promise.all`
+- **Archive**: DELETE all selected via `Promise.all`
+- **Export CSV**: client-side blob download of selected (or all) tenants as `.csv`
+
+### Tenant Provisioning Wizard
+- New page: `frontend/src/pages/TenantProvisioning.tsx`
+- 4-step wizard: BasicInfo (name/email/industry) → Suite Selection (civic/commerce/transport checkboxes) → Billing Plan (Starter/Pro/Enterprise with kobo pricing) → Review → POST /tenants
+- Success screen shows new tenant ID + link back to Tenant Management
+- Route: `/tenant-provisioning` (protected, `manage:tenants` permission)
+
+### AuditLog Action Filter
+- `<Select>` dropdown for action type (ALL / CREATE / UPDATE / DELETE / LOGIN / LOGOUT / SUSPEND / ACTIVATE)
+- Combined with debounced text search for full filtering
+
+### AI Quota Dashboard
+- New section in `OperationsOverview.tsx` below Suite Health Summary
+- Table: Vendor | Tenants | Tokens Used | Cost (₦) | Usage bar (proportional %)
+- Progress bars per vendor using `AI_VENDOR_COLORS`; totals row in `<tfoot>`
+
+### SWR + Dexie Cache (`useApi.ts`)
+- New options: `cacheKey?: string`, `cacheTtl?: number`
+- On fetch: reads Dexie `cachedData` table first → returns stale data instantly → background-fetches fresh → writes back to Dexie
+- `isStale: boolean` returned so UIs can show staleness indicator
+- All existing hooks updated with `cacheKey` and `cacheTtl` values
+
+### D1 Performance Indexes (`workers/migrations/011_indexes.sql`)
+- 25+ indexes across TENANT_DB, BILLING_DB, HEALTH_DB, RBAC_DB
+- Covers: `tenants.status`, `tenants.plan`, `partner_suite_assignments.suite+status`, `ledger_entries.tenant_id+created_at`, `alerts.severity+created_at`, `audit_log.user_id+action+created_at`
+
+### Workers Circuit Breaker + Alert Logging
+- In-memory circuit breaker (per Cloudflare isolate): opens after 5 consecutive 5xx failures; auto-resets after 30s
+- On every 5xx: async `INSERT INTO alerts` in HEALTH_DB (service=path, severity=critical)
+- Alert insert failure never masks the original error response
+
+### CI/CD Hardening (`.github/workflows/ci.yml`)
+- `actions/cache@v4` pnpm store cache for both frontend and workers jobs (keyed by `pnpm-lock.yaml` hash)
+- D1 backup step before staging deploy: `wrangler d1 export` all 4 databases → `/tmp/` (continue-on-error)
+- Post-deploy health check: curl `/health` with 5 retries + 10s backoff (continue-on-error)
 
 ---
 
@@ -228,6 +271,7 @@ Client-side pagination (page size: 10) added to `TenantManagement` and `PartnerM
 | Item | Priority | Note |
 |------|----------|------|
 | Production D1 UUIDs | HIGH | Replace `TODO_REPLACE_WITH_PROD_*` in `wrangler.toml` after creating prod D1 databases via `wrangler d1 create` |
+| Run 011_indexes.sql | HIGH | `wrangler d1 execute <db-name> --env staging --file=migrations/011_indexes.sql` for each of 4 databases |
 | Pre-existing TS errors | LOW | `Map.tsx` google types, `Home.tsx` streamdown module, `ModuleRegistry.tsx` Toggle2 — pre-existing before Phase 3; not blocking functionality |
 
 ---
@@ -242,3 +286,4 @@ Client-side pagination (page size: 10) added to `TenantManagement` and `PartnerM
 | #7 | `feature/phase-2-4-dx-i18n-features` | Phases 2–4 — mobile sidebar, pagination, audit log, i18n, PWA | — |
 | #8 | `feature/phase-2-tests-dx` | Phase 2 complete — 237 Vitest tests, E2E specs, seed script, CI hardening, PR template | 237 ✅ |
 | #9 | `feature/phase-3-i18n-pwa-a11y` | Phase 3 — i18n wired to all 15 pages, page titles via `t()`, `role="main"` a11y, 8 PWA icons (72–512px), SW v3 background sync, `usePendingSync` fix | — |
+| #10 | `feature/phase-4-performance-features` | Phase 4 — virtual scroll, server pagination, bulk actions, wizard, AI quota table, Dexie SWR, 25+ D1 indexes, circuit breaker, CI pnpm cache + D1 backup + health check | — |
