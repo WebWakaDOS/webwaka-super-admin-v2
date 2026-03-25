@@ -109,9 +109,15 @@ All 20 Vitest tests pass (Zod v4.3.6 compatible, using `error:` option for enum/
 | Item | Status | Detail |
 |------|--------|--------|
 | i18n wired to Sidebar | ✅ DONE | All 11 nav labels now use `t('nav.xxx')` from `useTranslation` hook |
+| i18n wired to ALL 15 pages | ✅ DONE | `useTranslation` + `t()` wired to Dashboard, Login, TenantManagement, Billing, PartnerManagement, OperationsOverview, DeploymentManager, AuditLog, Analytics, Settings, SystemHealth, ModuleRegistry, NotFound, Unauthorized, Health |
+| Page titles translated | ✅ DONE | Every page `<h1>` now uses `t()` key — e.g., `t('dashboard.title')`, `t('operations.title')`, `t('billing.title')` etc. |
 | Audit Log nav key | ✅ DONE | Added `auditLog` key to all 4 locales: English, Yorùbá, Igbo, Hausa |
 | Offline banner | ✅ DONE | `OfflineBanner.tsx` — listens to `window.online/offline` events; shows dismissible amber banner; mounted in `App.tsx` |
-| ARIA improvements | ✅ DONE | Sidebar `nav` now has `aria-label`; buttons have `aria-current="page"`; focus-visible ring added |
+| ARIA — `role="main"` | ✅ DONE | `role="main"` added to root div of all 15 page components |
+| ARIA improvements | ✅ DONE | Sidebar `nav` has `aria-label`; buttons have `aria-current="page"`; focus-visible ring; `aria-hidden="true"` on decorative icons |
+| PWA icons | ✅ DONE | Generated all 8 PNG icons (72×72 → 512×512) in `frontend/public/icons/` — all manifest.json sizes satisfied |
+| Service worker v3 | ✅ DONE | `frontend/public/sw.js` — Workbox-style: precache, network-first API routing, background sync (`pending-mutations` tag), push notifications |
+| usePendingSync hook | ✅ DONE | Flushes Dexie `pendingMutations` on `window.online` event; auth token from `localStorage.getItem('auth_token')` |
 
 ---
 
@@ -222,8 +228,7 @@ Client-side pagination (page size: 10) added to `TenantManagement` and `PartnerM
 | Item | Priority | Note |
 |------|----------|------|
 | Production D1 UUIDs | HIGH | Replace `TODO_REPLACE_WITH_PROD_*` in `wrangler.toml` after creating prod D1 databases via `wrangler d1 create` |
-| PWA icons | LOW | `/icons/icon-{192,512}.png` not yet present in `public/`; needed for full installability |
-| Background sync | LOW | `sw.js` in place but lacks background sync for offline mutations |
+| Pre-existing TS errors | LOW | `Map.tsx` google types, `Home.tsx` streamdown module, `ModuleRegistry.tsx` Toggle2 — pre-existing before Phase 3; not blocking functionality |
 
 ---
 
@@ -236,3 +241,4 @@ Client-side pagination (page size: 10) added to `TenantManagement` and `PartnerM
 | #6 | `feature/phase-1-api-security` | Phase 1 — Zod v4, 11 endpoints, rate limiting, middleware | 20 ✅ |
 | #7 | `feature/phase-2-4-dx-i18n-features` | Phases 2–4 — mobile sidebar, pagination, audit log, i18n, PWA | — |
 | #8 | `feature/phase-2-tests-dx` | Phase 2 complete — 237 Vitest tests, E2E specs, seed script, CI hardening, PR template | 237 ✅ |
+| #9 | `feature/phase-3-i18n-pwa-a11y` | Phase 3 — i18n wired to all 15 pages, page titles via `t()`, `role="main"` a11y, 8 PWA icons (72–512px), SW v3 background sync, `usePendingSync` fix | — |
