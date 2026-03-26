@@ -434,6 +434,95 @@ export default function OperationsOverview() {
         </CardContent>
       </Card>
 
+      {/* AI Quota Dashboard */}
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Quota Dashboard</CardTitle>
+          <CardDescription>
+            Token usage per tenant per vendor — Vendor Neutral AI · No single-provider lock-in
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {aiUsage.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              <div className="text-center">
+                <Cpu className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No AI quota data available yet</p>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm" aria-label="AI quota usage by vendor">
+                <thead>
+                  <tr className="border-b bg-muted/30 text-left">
+                    <th scope="col" className="px-4 py-2 font-semibold">Vendor</th>
+                    <th scope="col" className="px-4 py-2 font-semibold text-right">Tenants</th>
+                    <th scope="col" className="px-4 py-2 font-semibold text-right">Tokens Used</th>
+                    <th scope="col" className="px-4 py-2 font-semibold text-right">Cost (₦)</th>
+                    <th scope="col" className="px-4 py-2 font-semibold">Usage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiUsage.map((v) => {
+                    const totalAllTokens = aiUsage.reduce((s, x) => s + x.total_tokens, 0)
+                    const pct = totalAllTokens > 0 ? Math.round((v.total_tokens / totalAllTokens) * 100) : 0
+                    return (
+                      <tr key={v.ai_vendor} className="border-b hover:bg-muted/20">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="h-3 w-3 rounded-full shrink-0"
+                              style={{ backgroundColor: AI_VENDOR_COLORS[v.ai_vendor] || '#9ca3af' }}
+                            />
+                            <span className="font-medium capitalize">{v.ai_vendor}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">{v.tenant_count}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-mono">
+                          {v.total_tokens.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums font-mono">
+                          {formatKobo(v.total_cost_kobo)}
+                        </td>
+                        <td className="px-4 py-3 min-w-[120px]">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-muted rounded-full h-2">
+                              <div
+                                className="h-2 rounded-full"
+                                style={{
+                                  width: `${pct}%`,
+                                  backgroundColor: AI_VENDOR_COLORS[v.ai_vendor] || '#9ca3af',
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground w-8 text-right">{pct}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t bg-muted/10 font-semibold">
+                    <td className="px-4 py-2">Total</td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {aiUsage.reduce((s, v) => s + v.tenant_count, 0)}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums font-mono">
+                      {aiUsage.reduce((s, v) => s + v.total_tokens, 0).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums font-mono">
+                      {formatKobo(aiUsage.reduce((s, v) => s + v.total_cost_kobo, 0))}
+                    </td>
+                    <td className="px-4 py-2" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Footer */}
       <p className="text-xs text-muted-foreground text-center">
         Last updated: {summary?.generatedAt ? new Date(summary.generatedAt).toLocaleString('en-NG') : 'N/A'}

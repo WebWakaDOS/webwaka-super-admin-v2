@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useTranslation } from '@/hooks/useTranslation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -20,7 +19,6 @@ interface Module {
 }
 
 export default function ModuleRegistry() {
-  const { t } = useTranslation()
   const [modules, setModules] = useState<Module[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -104,7 +102,7 @@ export default function ModuleRegistry() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('nav.modules')}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Module Registry</h1>
           <p className="text-muted-foreground mt-2">Manage platform modules and feature flags.</p>
         </div>
 

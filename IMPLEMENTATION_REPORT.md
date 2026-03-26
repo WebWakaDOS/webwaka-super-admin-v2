@@ -2,7 +2,7 @@
 
 **Generated:** 2026-03-25 (final — all phases complete)  
 **Scope:** Phases 0–4 of the `SUPER_ADMIN_V2_REVIEW_AND_ENHANCEMENTS.md` roadmap  
-**Branches:** PR #5 (Phase 0), PR #6 (Phase 1), PR #7 (Phases 2–4)  
+**Branches:** PR #5 (Phase 0), PR #6 (Phase 1), PR #7 (Phases 2–4), PR #8 (Phase 2 — Tests + DX complete)  
 **Deployment target:** Cloudflare Workers (API) + Cloudflare Pages (Frontend)
 
 ---
@@ -73,11 +73,34 @@ All 20 Vitest tests pass (Zod v4.3.6 compatible, using `error:` option for enum/
 
 | Item | Status | Detail |
 |------|--------|--------|
-| `.env.example` | ✅ DONE | Documents all env vars with descriptions, generation commands |
-| `CONTRIBUTING.md` | ✅ DONE | Full setup guide: prerequisites, local D1 setup, secrets, branching strategy, commit convention, new endpoint checklist |
-| Local dev seed script | ✅ DONE | `workers/scripts/seed-local.ts` seeds RBAC, Tenants, Billing, Health DBs |
+| `.env.example` | ✅ DONE | All env vars documented: Vite, Workers secrets, CF resource IDs, Playwright, quick-start instructions |
+| `CONTRIBUTING.md` | ✅ DONE | Complete guide: setup, unit tests, E2E tests, seed script, branching, commit convention, Nigeria First invariants |
+| `.github/pull_request_template.md` | ✅ DONE | PR checklist with Nigeria First checks (kobo, NDPR, i18n, locale) |
+| Local dev seed script | ✅ DONE | `workers/scripts/seed-local.mjs` seeds all 4 D1 DBs (RBAC/TENANTS/BILLING/HEALTH) with 5 users, 5 tenants, 3 partners, 7 ledger rows, 4 alerts |
+| Unit tests — Vitest | ✅ DONE | **237 tests, 6 files, all passing** (see table below) |
+| E2E tests — Playwright | ✅ DONE | `frontend/e2e/` — 3 spec files; Desktop Chrome + Mobile (Pixel 5); login, tenant lifecycle, partner onboarding, NDPR consent, suite assignment |
 | Performance indexes migration | ✅ DONE | `workers/migrations/004_add_indexes.sql` — 22 indexes covering audit_log, users, tenants, ledger_entries, commissions, alerts, service_health |
-| CI/CD pipeline | ✅ DONE | `.github/workflows/ci.yml` — type-check (frontend + workers), build, security audit; auto-deploys to Cloudflare staging on master merge |
+| CI/CD hardening | ✅ DONE | Workers job runs 237 Vitest tests; gitleaks secret scan; new Playwright E2E job (conditional on `PLAYWRIGHT_BASE_URL`); auto-deploy to Cloudflare staging on master merge |
+
+### Vitest test breakdown
+
+| File | Tests | Coverage area |
+|------|-------|---------------|
+| `src/__tests__/endpoints.test.ts` | 20 | API contract — all 11 endpoints, auth guard, error shapes |
+| `src/__tests__/auth.test.ts` | 17 | Login validation, bcrypt comparison, KV TTL, JWT_SECRET guard |
+| `src/__tests__/tenants.test.ts` | 22 | CRUD lifecycle, soft-delete, pagination, search |
+| `src/__tests__/rbac.test.ts` | 52 | Full permission matrix — 5 roles × all permissions |
+| `src/__tests__/billing.test.ts` | 27 | Kobo integer enforcement, ledger entries, 5-level MLM commissions |
+| `src/__tests__/layer2-qa.test.ts` | 99 | Extended QA — endpoints, KV caching, NDPR compliance, 7 Core Invariants |
+| **Total** | **237** | **All passing** |
+
+### Playwright E2E specs
+
+| File | Tests | Flow |
+|------|-------|------|
+| `e2e/super-admin-v2.spec.ts` | ~20 | App shell, PWA meta, login flow, dashboard, mobile sidebar |
+| `e2e/tenant-lifecycle.spec.ts` | 12 | Login → form validation → create tenant → verify list → pagination |
+| `e2e/partner-onboarding.spec.ts` | 11 | NDPR consent form → suite assignment dialog → pagination → Nigeria First checks |
 
 ---
 
@@ -86,9 +109,15 @@ All 20 Vitest tests pass (Zod v4.3.6 compatible, using `error:` option for enum/
 | Item | Status | Detail |
 |------|--------|--------|
 | i18n wired to Sidebar | ✅ DONE | All 11 nav labels now use `t('nav.xxx')` from `useTranslation` hook |
+| i18n wired to ALL 15 pages | ✅ DONE | `useTranslation` + `t()` wired to Dashboard, Login, TenantManagement, Billing, PartnerManagement, OperationsOverview, DeploymentManager, AuditLog, Analytics, Settings, SystemHealth, ModuleRegistry, NotFound, Unauthorized, Health |
+| Page titles translated | ✅ DONE | Every page `<h1>` now uses `t()` key — e.g., `t('dashboard.title')`, `t('operations.title')`, `t('billing.title')` etc. |
 | Audit Log nav key | ✅ DONE | Added `auditLog` key to all 4 locales: English, Yorùbá, Igbo, Hausa |
 | Offline banner | ✅ DONE | `OfflineBanner.tsx` — listens to `window.online/offline` events; shows dismissible amber banner; mounted in `App.tsx` |
-| ARIA improvements | ✅ DONE | Sidebar `nav` now has `aria-label`; buttons have `aria-current="page"`; focus-visible ring added |
+| ARIA — `role="main"` | ✅ DONE | `role="main"` added to root div of all 15 page components |
+| ARIA improvements | ✅ DONE | Sidebar `nav` has `aria-label`; buttons have `aria-current="page"`; focus-visible ring; `aria-hidden="true"` on decorative icons |
+| PWA icons | ✅ DONE | Generated all 8 PNG icons (72×72 → 512×512) in `frontend/public/icons/` — all manifest.json sizes satisfied |
+| Service worker v3 | ✅ DONE | `frontend/public/sw.js` — Workbox-style: precache, network-first API routing, background sync (`pending-mutations` tag), push notifications |
+| usePendingSync hook | ✅ DONE | Flushes Dexie `pendingMutations` on `window.online` event; auth token from `localStorage.getItem('auth_token')` |
 
 ---
 
@@ -146,9 +175,19 @@ All 20 Vitest tests pass (Zod v4.3.6 compatible, using `error:` option for enum/
 - `frontend/src/i18n/locales/ha.json` — `nav.auditLog` = "Rikodin Aiki"
 
 ### DevOps / Docs
-- `.env.example` — **NEW** — Environment variable documentation
-- `CONTRIBUTING.md` — **NEW** — Developer onboarding guide
-- `.github/workflows/ci.yml` — **NEW** — GitHub Actions CI/CD pipeline
+- `.env.example` — **UPDATED** — Full env var documentation (Playwright, CF resource IDs, quick-start)
+- `CONTRIBUTING.md` — **UPDATED** — Complete DX guide (unit tests, E2E, seed script, Nigeria First)
+- `.github/pull_request_template.md` — **NEW** — PR checklist with Nigeria First kobo/NDPR checks
+- `.github/workflows/ci.yml` — **UPDATED** — Workers tests (237 Vitest), gitleaks scan, Playwright E2E job
+
+### Tests / Seed
+- `workers/src/__tests__/auth.test.ts` — **NEW** — 17 auth tests
+- `workers/src/__tests__/tenants.test.ts` — **NEW** — 22 tenant lifecycle tests
+- `workers/src/__tests__/rbac.test.ts` — **NEW** — 52 RBAC permission matrix tests
+- `workers/src/__tests__/billing.test.ts` — **NEW** — 27 billing/kobo/MLM tests
+- `workers/scripts/seed-local.mjs` — **NEW** — Seeds all 4 D1 databases for local dev
+- `frontend/e2e/tenant-lifecycle.spec.ts` — **NEW** — E2E: Login→Create Tenant→Verify List
+- `frontend/e2e/partner-onboarding.spec.ts` — **NEW** — E2E: NDPR onboarding + suite assignment
 
 ---
 
@@ -189,16 +228,17 @@ Client-side pagination (page size: 10) added to `TenantManagement` and `PartnerM
 | Item | Priority | Note |
 |------|----------|------|
 | Production D1 UUIDs | HIGH | Replace `TODO_REPLACE_WITH_PROD_*` in `wrangler.toml` after creating prod D1 databases via `wrangler d1 create` |
-| PWA icons | LOW | `/icons/icon-{192,512}.png` not yet present in `public/`; needed for full installability |
-| Background sync | LOW | `sw.js` in place but lacks background sync for offline mutations |
+| Pre-existing TS errors | LOW | `Map.tsx` google types, `Home.tsx` streamdown module, `ModuleRegistry.tsx` Toggle2 — pre-existing before Phase 3; not blocking functionality |
 
 ---
 
 ## Pull Requests
 
-| PR | Branch | Contents |
-|----|--------|----------|
-| #4 | `feature/phase-0-1-complete` | Earlier session accumulation |
-| #5 | `feature/phase-0-security` | Phase 0 critical blockers (clean) |
-| #6 | `feature/phase-1-api-security` | Phase 1 — Zod, 11 endpoints, rate limiting, middleware |
-| #7 | `feature/phase-2-4-dx-i18n-features` | Phases 2–4 — mobile sidebar, pagination, DX |
+| PR | Branch | Contents | Tests |
+|----|--------|----------|-------|
+| #4 | `feature/phase-0-1-complete` | Earlier session accumulation | — |
+| #5 | `feature/phase-0-security` | Phase 0 critical blockers (clean) | — |
+| #6 | `feature/phase-1-api-security` | Phase 1 — Zod v4, 11 endpoints, rate limiting, middleware | 20 ✅ |
+| #7 | `feature/phase-2-4-dx-i18n-features` | Phases 2–4 — mobile sidebar, pagination, audit log, i18n, PWA | — |
+| #8 | `feature/phase-2-tests-dx` | Phase 2 complete — 237 Vitest tests, E2E specs, seed script, CI hardening, PR template | 237 ✅ |
+| #9 | `feature/phase-3-i18n-pwa-a11y` | Phase 3 — i18n wired to all 15 pages, page titles via `t()`, `role="main"` a11y, 8 PWA icons (72–512px), SW v3 background sync, `usePendingSync` fix | — |

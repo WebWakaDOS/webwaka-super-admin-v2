@@ -5,6 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ClipboardList, Search, ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react'
 
 interface AuditEntry {
@@ -33,6 +40,8 @@ const ACTION_COLORS: Record<string, string> = {
   ACTIVATE: 'bg-emerald-100 text-emerald-800',
 }
 
+const ACTION_TYPES = ['ALL', 'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'SUSPEND', 'ACTIVATE']
+
 function getActionColor(action: string): string {
   for (const [key, value] of Object.entries(ACTION_COLORS)) {
     if (action.toUpperCase().includes(key)) return value
@@ -48,11 +57,12 @@ export default function AuditLog() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [actionFilter, setActionFilter] = useState('ALL')
 
-  // Debounce search input
+  // Debounce search
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
   }, [search])
 
   const fetchAuditLog = useCallback(async (page: number) => {
@@ -74,32 +84,34 @@ export default function AuditLog() {
     }
   }, [])
 
-  useEffect(() => {
-    fetchAuditLog(1)
-  }, [fetchAuditLog])
+  useEffect(() => { fetchAuditLog(1) }, [fetchAuditLog])
 
-  const filtered = debouncedSearch
-    ? entries.filter(
-        (e) =>
-          e.action.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          e.resource_type.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          e.user_id.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          (e.ip_address || '').includes(debouncedSearch)
-      )
-    : entries
+  const filtered = entries.filter((e) => {
+    const matchesSearch =
+      !debouncedSearch ||
+      e.action.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      e.resource_type.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      e.user_id.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      (e.ip_address || '').includes(debouncedSearch)
+
+    const matchesAction =
+      actionFilter === 'ALL' ||
+      e.action.toUpperCase().includes(actionFilter)
+
+    return matchesSearch && matchesAction
+  })
 
   const totalPages = Math.ceil(pagination.total / pagination.limit)
 
   return (
     <div className="space-y-6 p-6" role="main">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <ClipboardList className="h-6 w-6 text-primary" aria-hidden="true" />
           <div>
             <h1 className="text-2xl font-bold">{t('nav.auditLog')}</h1>
-            <p className="text-sm text-muted-foreground">
-              All sensitive operations across the platform
-            </p>
+            <p className="text-sm text-muted-foreground">All sensitive operations across the platform</p>
           </div>
         </div>
         <Button
@@ -114,20 +126,34 @@ export default function AuditLog() {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <Input
-          type="search"
-          placeholder="Filter by action, resource, user…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-          aria-label="Search audit log"
-        />
+      {/* Filters row */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            type="search"
+            placeholder="Filter by action, resource, user…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+            aria-label="Search audit log"
+          />
+        </div>
+        <Select value={actionFilter} onValueChange={setActionFilter}>
+          <SelectTrigger className="w-40" aria-label="Filter by action type">
+            <SelectValue placeholder="Action type" />
+          </SelectTrigger>
+          <SelectContent>
+            {ACTION_TYPES.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type === 'ALL' ? 'All actions' : type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Error state */}
+      {/* Error */}
       {error && (
         <div role="alert" className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle className="h-4 w-4 shrink-0" />
@@ -168,7 +194,9 @@ export default function AuditLog() {
                 ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
-                      No audit entries found{debouncedSearch ? ` matching "${debouncedSearch}"` : ''}
+                      No audit entries found
+                      {debouncedSearch ? ` matching "${debouncedSearch}"` : ''}
+                      {actionFilter !== 'ALL' ? ` with action "${actionFilter}"` : ''}
                     </td>
                   </tr>
                 ) : (
@@ -204,7 +232,7 @@ export default function AuditLog() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && !debouncedSearch && (
+          {totalPages > 1 && !debouncedSearch && actionFilter === 'ALL' && (
             <div className="flex items-center justify-between border-t px-4 py-3">
               <span className="text-sm text-muted-foreground">
                 Page {pagination.page} of {totalPages}

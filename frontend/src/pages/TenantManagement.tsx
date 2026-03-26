@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Search, AlertCircle, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { Plus, Edit2, Trash2, Search, AlertCircle, Loader2, Download, Ban, Archive, CheckSquare, Square } from 'lucide-react'
 import { useTranslation } from '@/hooks/useTranslation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,14 +31,21 @@ interface Tenant {
   revenue?: number
 }
 
-const PAGE_SIZE = 10
+interface ServerPagination {
+  page: number
+  limit: number
+  total: number
+}
+
+const PAGE_SIZE = 50
+const ROW_HEIGHT = 56
 
 export default function TenantManagement() {
   const { t } = useTranslation()
   const [tenants, setTenants] = useState<Tenant[]>([])
-  const [filteredTenants, setFilteredTenants] = useState<Tenant[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
+  const [serverPage, setServerPage] = useState(1)
+  const [pagination, setPagination] = useState<ServerPagination>({ page: 1, limit: PAGE_SIZE, total: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -45,114 +54,160 @@ export default function TenantManagement() {
   const [formError, setFormError] = useState<string | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const parentRef = useRef<HTMLDivElement>(null)
 
-  // Fetch tenants from D1
-  useEffect(() => {
-    const fetchTenants = async () => {
-      try {
-        setLoading(true)
-        setError(null)
+  const fetchTenants = useCallback(async (page: number, search?: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      })
+      if (search) params.set('search', search)
 
-        const response = await apiClient.get('/tenants')
-        if (!response.success) {
-          throw new Error('Failed to fetch tenants')
-        }
+      const response = await apiClient.get(`/tenants?${params.toString()}`)
+      if (!response.success) throw new Error('Failed to fetch tenants')
 
-        const tenantsData = ((response.data as any)?.tenants || response.data || []) as Tenant[]
-        setTenants(tenantsData)
-        setFilteredTenants(tenantsData)
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch tenants'
-        setError(errorMessage)
-        toast.error(errorMessage)
-      } finally {
-        setLoading(false)
-      }
+      const data = response.data as any
+      const tenantsData: Tenant[] = data?.tenants || data || []
+      const pag: ServerPagination = data?.pagination || { page, limit: PAGE_SIZE, total: tenantsData.length }
+
+      setTenants(tenantsData)
+      setPagination(pag)
+      setSelectedIds(new Set())
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch tenants'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setLoading(false)
     }
-
-    fetchTenants()
   }, [])
 
-  // Filter tenants based on search; reset to page 1 on new search
   useEffect(() => {
-    const filtered = tenants.filter(
-      (tenant) =>
-        tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tenant.email.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    setFilteredTenants(filtered)
-    setCurrentPage(1)
-  }, [searchTerm, tenants])
+    const timer = setTimeout(() => {
+      fetchTenants(1, searchTerm || undefined)
+      setServerPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm, fetchTenants])
 
-  const handleCreateTenant = () => {
-    setEditingTenant(null)
-    setFormError(null)
-    setIsFormOpen(true)
+  useEffect(() => {
+    fetchTenants(serverPage, searchTerm || undefined)
+  }, [serverPage]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Virtual scroll via @tanstack/react-virtual
+  const rowVirtualizer = useVirtualizer({
+    count: tenants.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  })
+
+  // ── Selection helpers ──────────────────────────────────────────────────────
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
-  const handleEditTenant = (tenant: Tenant) => {
-    setEditingTenant(tenant)
-    setFormError(null)
-    setIsFormOpen(true)
+  const toggleSelectAll = () => {
+    if (selectedIds.size === tenants.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(tenants.map((t) => t.id)))
+    }
   }
+
+  // ── Bulk actions ───────────────────────────────────────────────────────────
+
+  const handleBulkSuspend = async () => {
+    if (!selectedIds.size) return
+    setBulkLoading(true)
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) =>
+          apiClient.put(`/tenants/${id}`, { status: 'suspended' }).catch(() => null)
+        )
+      )
+      toast.success(`Suspended ${selectedIds.size} tenant(s)`)
+      fetchTenants(serverPage, searchTerm || undefined)
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const handleBulkArchive = async () => {
+    if (!selectedIds.size) return
+    setBulkLoading(true)
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) =>
+          apiClient.delete(`/tenants/${id}`).catch(() => null)
+        )
+      )
+      toast.success(`Archived ${selectedIds.size} tenant(s)`)
+      fetchTenants(serverPage, searchTerm || undefined)
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const handleBulkExportCSV = () => {
+    const rows = tenants.filter((t) => selectedIds.size === 0 || selectedIds.has(t.id))
+    const headers = ['ID', 'Name', 'Email', 'Plan', 'Status', 'Created At']
+    const csvRows = [
+      headers.join(','),
+      ...rows.map((t) =>
+        [t.id, `"${t.name}"`, t.email, t.plan, t.status, new Date(t.createdAt).toISOString()].join(',')
+      ),
+    ]
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `tenants-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${rows.length} tenant(s) to CSV`)
+  }
+
+  // ── CRUD handlers ──────────────────────────────────────────────────────────
+
+  const handleCreateTenant = () => { setEditingTenant(null); setFormError(null); setIsFormOpen(true) }
+  const handleEditTenant = (tenant: Tenant) => { setEditingTenant(tenant); setFormError(null); setIsFormOpen(true) }
 
   const handleSubmitForm = async (formData: TenantFormData) => {
     try {
       setIsSubmitting(true)
       setFormError(null)
-
       if (editingTenant) {
-        // Update existing tenant
         const response = await apiClient.put(`/tenants/${editingTenant.id}`, {
-          name: formData.name,
-          email: formData.email,
-          status: formData.status,
-          plan: formData.plan,
+          name: formData.name, email: formData.email, status: formData.status, plan: formData.plan,
         })
-
-        if (!response.success) {
-          throw new Error('Failed to update tenant')
-        }
-
-        setTenants(
-          tenants.map((t) =>
-            t.id === editingTenant.id
-              ? {
-                  ...t,
-                  name: formData.name,
-                  email: formData.email,
-                  status: formData.status,
-                  plan: formData.plan,
-                }
-              : t
-          )
-        )
-
+        if (!response.success) throw new Error('Failed to update tenant')
+        setTenants((prev) => prev.map((t) => t.id === editingTenant.id ? { ...t, ...formData } : t))
         toast.success('Tenant updated successfully')
       } else {
-        // Create new tenant
         const response = await apiClient.post('/tenants', {
-          name: formData.name,
-          email: formData.email,
-          status: formData.status,
-          plan: formData.plan,
+          name: formData.name, email: formData.email, status: formData.status, plan: formData.plan,
         })
-
-        if (!response.success) {
-          throw new Error('Failed to create tenant')
-        }
-
-        const newTenant = response.data
-        setTenants([...tenants, newTenant])
+        if (!response.success) throw new Error('Failed to create tenant')
         toast.success('Tenant created successfully')
+        fetchTenants(1, undefined)
       }
-
       setIsFormOpen(false)
       setEditingTenant(null)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
-      setFormError(errorMessage)
-      toast.error(errorMessage)
+      const msg = err instanceof Error ? err.message : 'An error occurred'
+      setFormError(msg)
+      toast.error(msg)
     } finally {
       setIsSubmitting(false)
     }
@@ -160,35 +215,35 @@ export default function TenantManagement() {
 
   const handleDeleteTenant = async () => {
     if (!tenantToDelete) return
-
     try {
       setIsSubmitting(true)
-
       const response = await apiClient.delete(`/tenants/${tenantToDelete.id}`)
-      if (!response.success) {
-        throw new Error('Failed to delete tenant')
-      }
-
-      setTenants(tenants.filter((t) => t.id !== tenantToDelete.id))
+      if (!response.success) throw new Error('Failed to delete tenant')
+      setTenants((prev) => prev.filter((t) => t.id !== tenantToDelete.id))
       toast.success('Tenant deleted successfully')
       setDeleteConfirmOpen(false)
       setTenantToDelete(null)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete tenant'
-      toast.error(errorMessage)
+      toast.error(err instanceof Error ? err.message : 'Failed to delete tenant')
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const statusColor = (status: Tenant['status']) =>
+    status === 'active' ? 'bg-green-100 text-green-800'
+    : status === 'suspended' ? 'bg-red-100 text-red-800'
+    : 'bg-yellow-100 text-yellow-800'
+
+  const totalPages = Math.ceil(pagination.total / PAGE_SIZE)
+
   if (error && tenants.length === 0) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('tenants.title')}</h1>
           <p className="text-muted-foreground mt-2">{t('tenants.subtitle')}</p>
         </div>
-
         <Card className="border-red-200 bg-red-50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -218,134 +273,174 @@ export default function TenantManagement() {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search by name or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-          disabled={loading}
-        />
+      {/* Search + Bulk Actions */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or email…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
+            <Button variant="outline" size="sm" onClick={handleBulkSuspend} disabled={bulkLoading}>
+              <Ban className="h-3.5 w-3.5 mr-1" /> Suspend
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleBulkArchive} disabled={bulkLoading}>
+              <Archive className="h-3.5 w-3.5 mr-1" /> Archive
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleBulkExportCSV}>
+              <Download className="h-3.5 w-3.5 mr-1" /> Export CSV
+            </Button>
+          </div>
+        )}
+        <Button variant="ghost" size="sm" onClick={handleBulkExportCSV} className="shrink-0">
+          <Download className="h-4 w-4 mr-1" /> Export All
+        </Button>
       </div>
 
-      {/* Tenants Table */}
+      {/* Tenant Table with Virtual Scroll */}
       <Card>
         <CardHeader>
-          <CardTitle>Tenants</CardTitle>
-          <CardDescription>A list of all platform tenants and their status.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-12" />
-              <Skeleton className="h-12" />
-              <Skeleton className="h-12" />
-              <Skeleton className="h-12" />
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Tenants</CardTitle>
+              <CardDescription>
+                {loading ? 'Loading…' : `${pagination.total} total · Page ${pagination.page} of ${Math.max(1, totalPages)}`}
+              </CardDescription>
             </div>
-          ) : filteredTenants.length > 0 ? (() => {
-            const totalPages = Math.ceil(filteredTenants.length / PAGE_SIZE)
-            const pagedTenants = filteredTenants.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-            return (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-semibold">Name</th>
-                    <th className="text-left py-3 px-4 font-semibold">Email</th>
-                    <th className="text-left py-3 px-4 font-semibold">Plan</th>
-                    <th className="text-left py-3 px-4 font-semibold">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold">Created</th>
-                    <th className="text-right py-3 px-4 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedTenants.map((tenant) => (
-                    <tr key={tenant.id} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-4 font-medium">{tenant.name}</td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{tenant.email}</td>
-                      <td className="py-3 px-4">
-                        <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {tenant.plan}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                            tenant.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : tenant.status === 'suspended'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                          }`}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="space-y-0">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="border-b px-4 py-3">
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : tenants.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No tenants found{searchTerm ? ` matching "${searchTerm}"` : ''}.
+            </div>
+          ) : (
+            <>
+              {/* Table header */}
+              <div className="grid grid-cols-[32px_1fr_1fr_96px_96px_100px_80px] gap-2 border-b px-4 py-2 bg-muted/30 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  aria-label="Select all"
+                  className="flex items-center"
+                >
+                  {selectedIds.size === tenants.length && tenants.length > 0
+                    ? <CheckSquare className="h-4 w-4 text-primary" />
+                    : <Square className="h-4 w-4" />
+                  }
+                </button>
+                <span>Name</span>
+                <span>Email</span>
+                <span>Plan</span>
+                <span>Status</span>
+                <span>Created</span>
+                <span className="text-right">Actions</span>
+              </div>
+
+              {/* Virtualised rows */}
+              <div
+                ref={parentRef}
+                className="overflow-y-auto"
+                style={{ height: Math.min(tenants.length * ROW_HEIGHT, 560) }}
+              >
+                <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const tenant = tenants[virtualRow.index]
+                    const isSelected = selectedIds.has(tenant.id)
+                    return (
+                      <div
+                        key={tenant.id}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        className={`absolute inset-x-0 grid grid-cols-[32px_1fr_1fr_96px_96px_100px_80px] gap-2 items-center border-b px-4 transition-colors ${
+                          isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'
+                        }`}
+                        style={{ top: virtualRow.start, height: ROW_HEIGHT }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleSelect(tenant.id)}
+                          aria-label={`Select ${tenant.name}`}
                         >
+                          {isSelected
+                            ? <CheckSquare className="h-4 w-4 text-primary" />
+                            : <Square className="h-4 w-4 text-muted-foreground" />
+                          }
+                        </button>
+                        <span className="font-medium text-sm truncate">{tenant.name}</span>
+                        <span className="text-xs text-muted-foreground truncate">{tenant.email}</span>
+                        <Badge variant="outline" className="text-xs capitalize justify-self-start">
+                          {tenant.plan}
+                        </Badge>
+                        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${statusColor(tenant.status)}`}>
                           {tenant.status}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">
-                        {new Date(tenant.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditTenant(tenant)}
-                            disabled={isSubmitting}
-                          >
-                            <Edit2 className="h-4 w-4" />
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(tenant.createdAt).toLocaleDateString()}
+                        </span>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditTenant(tenant)} aria-label="Edit">
+                            <Edit2 className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              setTenantToDelete(tenant)
-                              setDeleteConfirmOpen(true)
-                            }}
-                            disabled={isSubmitting}
+                            onClick={() => { setTenantToDelete(tenant); setDeleteConfirmOpen(true) }}
+                            aria-label="Delete"
                           >
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
                           </Button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {/* Pagination controls */}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Server-side pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t">
                   <p className="text-sm text-muted-foreground">
-                    Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredTenants.length)} of {filteredTenants.length}
+                    {((serverPage - 1) * PAGE_SIZE) + 1}–{Math.min(serverPage * PAGE_SIZE, pagination.total)} of {pagination.total}
                   </p>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
+                      onClick={() => setServerPage((p) => Math.max(1, p - 1))}
+                      disabled={serverPage === 1 || loading}
                     >
                       Previous
                     </Button>
-                    <span className="text-sm">Page {currentPage} of {totalPages}</span>
+                    <span className="text-sm tabular-nums">
+                      Page {serverPage} of {totalPages}
+                    </span>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
+                      onClick={() => setServerPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={serverPage >= totalPages || loading}
                     >
                       Next
                     </Button>
                   </div>
                 </div>
               )}
-            </div>
-            )
-          })() : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No tenants found.</p>
-            </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -355,22 +450,18 @@ export default function TenantManagement() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         onSubmit={handleSubmitForm}
-        initialData={
-          editingTenant
-            ? {
-                id: editingTenant.id,
-                name: editingTenant.name,
-                email: editingTenant.email,
-                status: editingTenant.status,
-                plan: editingTenant.plan,
-              }
-            : undefined
-        }
+        initialData={editingTenant ? {
+          id: editingTenant.id,
+          name: editingTenant.name,
+          email: editingTenant.email,
+          status: editingTenant.status,
+          plan: editingTenant.plan,
+        } : undefined}
         isLoading={isSubmitting}
         error={formError}
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from '@/hooks/useTranslation';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -85,7 +84,6 @@ const ALERTS = [
 ];
 
 export default function SystemHealth() {
-  const { t } = useTranslation();
   const [selectedService, setSelectedService] = useState<string | null>(null);
 
   const getStatusIcon = (status: string) => {
@@ -135,7 +133,7 @@ export default function SystemHealth() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">{t('health.title')}</h1>
+        <h1 className="text-3xl font-bold">System Health</h1>
         <p className="text-gray-400 mt-1">Platform infrastructure and service monitoring</p>
       </div>
 

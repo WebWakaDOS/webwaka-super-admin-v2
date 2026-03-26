@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, CheckCircle2, AlertTriangle, Activity } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
-import { useTranslation } from '@/hooks/useTranslation'
 import { toast } from 'sonner'
 
 interface ServiceStatus {
@@ -28,7 +27,6 @@ interface HealthMetrics {
 }
 
 export default function Health() {
-  const { t } = useTranslation()
   const [services, setServices] = useState<ServiceStatus[]>([])
   const [metrics, setMetrics] = useState<HealthMetrics | null>(null)
   const [loading, setLoading] = useState(true)
@@ -46,7 +44,7 @@ export default function Health() {
           throw new Error('Failed to fetch health status')
         }
 
-        const healthData: any = healthResponse.data || {}
+        const healthData = healthResponse.data || {}
         setServices(healthData.services || [])
         setMetrics(healthData.metrics || null)
         setLoading(false)
@@ -95,7 +93,7 @@ export default function Health() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('health.title')}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Platform Health</h1>
           <p className="text-muted-foreground mt-2">Real-time platform status and metrics.</p>
         </div>
 
@@ -115,7 +113,7 @@ export default function Health() {
   }
 
   return (
-    <div className="space-y-6" role="main">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Platform Health</h1>

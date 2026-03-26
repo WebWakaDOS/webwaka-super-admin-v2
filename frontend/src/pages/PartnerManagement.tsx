@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useTranslation } from '@/hooks/useTranslation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -322,10 +321,7 @@ function SuiteAssignment({ partner, onSuccess }: SuiteAssignmentProps) {
 // MAIN PAGE
 // ============================================================================
 
-const PARTNER_PAGE_SIZE = 10
-
 export default function PartnerManagement() {
-  const { t } = useTranslation()
   const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -333,12 +329,10 @@ export default function PartnerManagement() {
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('ALL')
   const [filterTier, setFilterTier] = useState<string>('ALL')
-  const [currentPage, setCurrentPage] = useState(1)
 
   const fetchPartners = useCallback(async () => {
     setLoading(true)
     setError(null)
-    setCurrentPage(1)
     try {
       const params = new URLSearchParams()
       if (filterStatus !== 'ALL') params.set('status', filterStatus)
@@ -366,7 +360,7 @@ export default function PartnerManagement() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('partners.title')}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Partner Management</h1>
           <p className="text-muted-foreground mt-1">
             Onboard partners, assign suite access, manage commissions
           </p>
@@ -494,10 +488,7 @@ export default function PartnerManagement() {
               <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p>No partners found. Onboard your first partner.</p>
             </div>
-          ) : (() => {
-            const totalPages = Math.ceil(partners.length / PARTNER_PAGE_SIZE)
-            const pagedPartners = partners.slice((currentPage - 1) * PARTNER_PAGE_SIZE, currentPage * PARTNER_PAGE_SIZE)
-            return (
+          ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -512,7 +503,7 @@ export default function PartnerManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedPartners.map((partner) => {
+                  {partners.map((partner) => {
                     const suites: string[] = (() => {
                       try { return JSON.parse(partner.assigned_suites) } catch { return [] }
                     })()
@@ -584,35 +575,8 @@ export default function PartnerManagement() {
                   })}
                 </TableBody>
               </Table>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    Showing {(currentPage - 1) * PARTNER_PAGE_SIZE + 1}–{Math.min(currentPage * PARTNER_PAGE_SIZE, partners.length)} of {partners.length}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
-            )
-          })()}
+          )}
         </CardContent>
       </Card>
     </div>

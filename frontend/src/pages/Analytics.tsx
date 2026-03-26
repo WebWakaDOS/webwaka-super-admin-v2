@@ -1,9 +1,7 @@
-import { useTranslation } from "@/hooks/useTranslation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const Analytics = () => {
-  const { t } = useTranslation();
   // Sample data for analytics
   const userGrowthData = [
     { month: "Jan", users: 400, activeUsers: 240 },
@@ -34,10 +32,10 @@ const Analytics = () => {
   const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
   return (
-    <div className="space-y-6" role="main">
+    <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t('nav.analytics')}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
         <p className="text-muted-foreground mt-2">
           Platform performance metrics and usage analytics
         </p>
