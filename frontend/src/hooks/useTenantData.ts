@@ -32,12 +32,14 @@ export function useTenantData(autoRefresh: boolean = true, refreshInterval: numb
       ]);
 
       if (statsRes.success && tenantsRes.success) {
+        // Workers returns pagination inside a `pagination` key: { tenants, pagination: { page, limit, total } }
+        const pagination = tenantsRes.data?.pagination
         setState((prev) => ({
           ...prev,
           stats: statsRes.data || null,
           tenants: tenantsRes.data?.tenants || [],
-          total: tenantsRes.data?.total || 0,
-          page: tenantsRes.data?.page || 1,
+          total: pagination?.total ?? 0,
+          page: pagination?.page ?? 1,
           loading: false,
           error: null,
         }));
@@ -62,7 +64,8 @@ export function useTenantData(autoRefresh: boolean = true, refreshInterval: numb
     try {
       wsRef.current = apiClient.connectWebSocket(
         '/ws/tenants',
-        (message) => {
+        (rawMessage) => {
+          const message = rawMessage as { type: string; data: TenantStats }
           if (message.type === 'tenant_stats') {
             setState((prev) => ({
               ...prev,
