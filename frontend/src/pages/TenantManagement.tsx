@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Search, AlertCircle, Loader2 } from 'lucide-react'
+import { useTranslation } from '@/hooks/useTranslation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,6 +32,7 @@ interface Tenant {
 const PAGE_SIZE = 10
 
 export default function TenantManagement() {
+  const { t } = useTranslation()
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [filteredTenants, setFilteredTenants] = useState<Tenant[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -183,8 +185,8 @@ export default function TenantManagement() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tenant Management</h1>
-          <p className="text-muted-foreground mt-2">Manage your platform tenants and their configurations.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('tenants.title')}</h1>
+          <p className="text-muted-foreground mt-2">{t('tenants.subtitle')}</p>
         </div>
 
         <Card className="border-red-200 bg-red-50">
@@ -203,12 +205,12 @@ export default function TenantManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tenant Management</h1>
-          <p className="text-muted-foreground mt-2">Manage your platform tenants and their configurations.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('tenants.title')}</h1>
+          <p className="text-muted-foreground mt-2">{t('tenants.subtitle')}</p>
         </div>
         <Button onClick={handleCreateTenant} disabled={loading}>
           <Plus className="mr-2 h-4 w-4" />

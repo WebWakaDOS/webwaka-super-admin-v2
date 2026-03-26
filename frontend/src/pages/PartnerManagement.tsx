@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useTranslation } from '@/hooks/useTranslation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -324,6 +325,7 @@ function SuiteAssignment({ partner, onSuccess }: SuiteAssignmentProps) {
 const PARTNER_PAGE_SIZE = 10
 
 export default function PartnerManagement() {
+  const { t } = useTranslation()
   const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -364,7 +366,7 @@ export default function PartnerManagement() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Partner Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('partners.title')}</h1>
           <p className="text-muted-foreground mt-1">
             Onboard partners, assign suite access, manage commissions
           </p>

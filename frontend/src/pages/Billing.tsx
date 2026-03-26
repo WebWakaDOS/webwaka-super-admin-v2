@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, TrendingUp, DollarSign } from 'lucide-react'
+import { useTranslation } from '@/hooks/useTranslation'
 import { apiClient } from '@/lib/api-client'
 import { formatKoboAsNGN, calculateCommission } from '@/lib/commissionCalculator'
 import {
@@ -42,6 +43,7 @@ interface CommissionSummary {
 }
 
 export default function Billing() {
+  const { t } = useTranslation()
   const [ledger, setLedger] = useState<LedgerEntry[]>([])
   const [commissionSummary, setCommissionSummary] = useState<CommissionSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -59,7 +61,7 @@ export default function Billing() {
           throw new Error('Failed to fetch billing ledger')
         }
 
-        const ledgerData = ledgerResponse.data || []
+        const ledgerData = (ledgerResponse.data as LedgerEntry[]) || []
         setLedger(ledgerData)
 
         // Calculate commission summary
@@ -104,8 +106,8 @@ export default function Billing() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing & Ledger</h1>
-          <p className="text-muted-foreground mt-2">Manage platform billing and commission tracking.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('billing.title')}</h1>
+          <p className="text-muted-foreground mt-2">{t('billing.subtitle')}</p>
         </div>
 
         <Card className="border-red-200 bg-red-50">
@@ -128,11 +130,11 @@ export default function Billing() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Billing & Ledger</h1>
-        <p className="text-muted-foreground mt-2">Manage platform billing and commission tracking.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('billing.title')}</h1>
+        <p className="text-muted-foreground mt-2">{t('billing.subtitle')}</p>
       </div>
 
       {/* Commission Summary Cards */}
