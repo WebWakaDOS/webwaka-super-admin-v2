@@ -20,7 +20,7 @@ export function useBillingData(autoRefresh: boolean = true, refreshInterval: num
   // Fetch billing data from API
   const fetchBillingData = async () => {
     try {
-      const response = await apiClient.getBillingData();
+      const response = await apiClient.getBillingMetrics();
 
       if (response.success && response.data) {
         setState({
@@ -49,7 +49,8 @@ export function useBillingData(autoRefresh: boolean = true, refreshInterval: num
     try {
       wsRef.current = apiClient.connectWebSocket(
         '/ws/billing',
-        (message) => {
+        (rawMessage) => {
+          const message = rawMessage as { type: string; data: BillingData }
           if (message.type === 'billing_update') {
             setState((prev) => ({
               ...prev,

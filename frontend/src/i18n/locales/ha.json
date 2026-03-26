@@ -12,7 +12,8 @@
     "deployments": "Turawa",
     "health": "Lafiyar Tsarin",
     "settings": "Saiti",
-    "logout": "Fita"
+    "logout": "Fita",
+    "auditLog": "Rikodin Aiki"
   },
   "common": {
     "loading": "Ana lodi...",

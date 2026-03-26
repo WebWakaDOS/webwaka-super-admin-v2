@@ -385,7 +385,7 @@ app.post('/auth/login', async (c) => {
 
     if (!c.env.JWT_SECRET) {
       console.error('FATAL: JWT_SECRET environment variable is not set')
-      throw new HTTPException(500, { message: 'JWT_SECRET environment variable required' })
+      throw new HTTPException(500, { message: 'Server configuration error' })
     }
 
     const token = await signJWT({
