@@ -28,10 +28,13 @@ interface Tenant {
   revenue?: number
 }
 
+const PAGE_SIZE = 10
+
 export default function TenantManagement() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [filteredTenants, setFilteredTenants] = useState<Tenant[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -53,7 +56,7 @@ export default function TenantManagement() {
           throw new Error('Failed to fetch tenants')
         }
 
-        const tenantsData = response.data || []
+        const tenantsData = ((response.data as any)?.tenants || response.data || []) as Tenant[]
         setTenants(tenantsData)
         setFilteredTenants(tenantsData)
       } catch (err) {
@@ -68,7 +71,7 @@ export default function TenantManagement() {
     fetchTenants()
   }, [])
 
-  // Filter tenants based on search
+  // Filter tenants based on search; reset to page 1 on new search
   useEffect(() => {
     const filtered = tenants.filter(
       (tenant) =>
@@ -76,6 +79,7 @@ export default function TenantManagement() {
         tenant.email.toLowerCase().includes(searchTerm.toLowerCase())
     )
     setFilteredTenants(filtered)
+    setCurrentPage(1)
   }, [searchTerm, tenants])
 
   const handleCreateTenant = () => {
@@ -238,7 +242,10 @@ export default function TenantManagement() {
               <Skeleton className="h-12" />
               <Skeleton className="h-12" />
             </div>
-          ) : filteredTenants.length > 0 ? (
+          ) : filteredTenants.length > 0 ? (() => {
+            const totalPages = Math.ceil(filteredTenants.length / PAGE_SIZE)
+            const pagedTenants = filteredTenants.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+            return (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -252,7 +259,7 @@ export default function TenantManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTenants.map((tenant) => (
+                  {pagedTenants.map((tenant) => (
                     <tr key={tenant.id} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-4 font-medium">{tenant.name}</td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{tenant.email}</td>
@@ -304,8 +311,36 @@ export default function TenantManagement() {
                   ))}
                 </tbody>
               </table>
+              {/* Pagination controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredTenants.length)} of {filteredTenants.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm">Page {currentPage} of {totalPages}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
+            )
+          })() : (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No tenants found.</p>
             </div>

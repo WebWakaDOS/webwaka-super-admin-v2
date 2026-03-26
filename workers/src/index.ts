@@ -23,45 +23,8 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { HTTPException } from 'hono/http-exception'
 import bcrypt from 'bcryptjs'
+import { signJWT } from '@webwaka/core'
 import type { Context as HonoContext } from 'hono'
-import { z } from 'zod'
-
-// ============================================================================
-// INLINE JWT SIGNING — replaces @webwaka/core dependency
-// Uses Web Crypto API (available in Cloudflare Workers + modern browsers)
-// ============================================================================
-async function signJWT(
-  payload: Record<string, unknown>,
-  secret: string,
-  expiresInSeconds = 86400
-): Promise<string> {
-  const header = { alg: 'HS256', typ: 'JWT' }
-  const now = Math.floor(Date.now() / 1000)
-  const claims = { ...payload, iat: now, exp: now + expiresInSeconds }
-
-  const encode = (obj: unknown) =>
-    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-
-  const headerB64 = encode(header)
-  const payloadB64 = encode(claims)
-  const signingInput = `${headerB64}.${payloadB64}`
-
-  const keyData = new TextEncoder().encode(secret)
-  const key = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput))
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-
-  return `${signingInput}.${sigB64}`
-}
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -95,210 +58,14 @@ type Context = HonoContext<{ Bindings: Bindings }>
 const app = new Hono<{ Bindings: Bindings }>()
 
 app.use('*', logger())
-
-// ============================================================================
-// REQUEST ID MIDDLEWARE — attaches X-Request-ID + structured JSON logging
-// ============================================================================
-app.use('*', async (c, next) => {
-  const reqId = crypto.randomUUID()
-  const start = Date.now()
-  c.res.headers.set('X-Request-ID', reqId)
-  await next()
-  const durationMs = Date.now() - start
-  const status = c.res.status
-  const { method, path } = c.req
-  console.log(JSON.stringify({ reqId, method, path, status, durationMs }))
-})
-
-// ============================================================================
-// CORS — restrict to known origins (adjust for your Pages domains)
-// ============================================================================
 app.use(
   '*',
   cors({
-    origin: (origin) => {
-      const allowed = [
-        'https://webwaka-super-admin-ui.pages.dev',
-        'https://webwaka-super-admin.pages.dev',
-        'https://admin.webwaka.com',
-        'http://localhost:5000',
-        'http://localhost:5173',
-        'http://localhost:3000',
-      ]
-      // Allow Cloudflare Pages preview deployments (*.pages.dev)
-      if (!origin) return '*'
-      if (allowed.includes(origin)) return origin
-      if (origin.endsWith('.pages.dev')) return origin
-      if (origin.endsWith('.webwaka.com')) return origin
-      return null
-    },
+    origin: '*',
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-    exposeHeaders: ['X-Request-ID'],
-    credentials: true,
+    allowHeaders: ['Content-Type', 'Authorization'],
   })
 )
-
-// ============================================================================
-// SECURITY HEADERS MIDDLEWARE
-// ============================================================================
-app.use('*', async (c, next) => {
-  await next()
-  c.res.headers.set('X-Content-Type-Options', 'nosniff')
-  c.res.headers.set('X-Frame-Options', 'DENY')
-  c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  if (c.env.ENVIRONMENT === 'production') {
-    c.res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
-  }
-})
-
-// ============================================================================
-// ZOD SCHEMAS — input validation for all POST/PUT endpoints
-// ============================================================================
-
-const LoginSchema = z.object({
-  email: z.string().email('Valid email address is required'),
-  password: z.string().min(1, 'Password is required'),
-})
-
-const TenantCreateSchema = z.object({
-  name: z.string().min(1, 'name is required'),
-  email: z.string().email('Valid email address is required'),
-  industry: z.string().min(1, 'industry is required'),
-  domain: z.string().optional(),
-})
-
-const TenantUpdateSchema = z.object({
-  name: z.string().optional(),
-  email: z.string().email().optional(),
-  status: z.enum(['ACTIVE', 'SUSPENDED', 'PROVISIONING', 'ARCHIVED']).optional(),
-  industry: z.string().optional(),
-  domain: z.string().optional(),
-})
-
-const PartnerCreateSchema = z.object({
-  name: z.string().min(1, 'name is required'),
-  email: z.string().email('Valid email address is required'),
-  phone: z.string().optional(),
-  company: z.string().optional(),
-  tier: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
-  commission_rate_percent: z.number().min(0).max(100).optional(),
-  ndpr_consent: z.literal(true, { error: 'NDPR consent is required (Nigeria First invariant)' }),
-  monthly_fee_kobo: z.number().int().optional(),
-  notes: z.string().optional(),
-})
-
-const PartnerUpdateSchema = z.object({
-  name: z.string().optional(),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  company: z.string().optional(),
-  status: z.enum(['PENDING', 'ACTIVE', 'SUSPENDED', 'CHURNED']).optional(),
-  tier: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
-  commission_rate_percent: z.number().min(0).max(100).optional(),
-  monthly_fee_kobo: z.number().int().optional(),
-  notes: z.string().optional(),
-})
-
-const PartnerSuiteSchema = z.object({
-  suite: z.string().min(1, 'suite is required'),
-  action: z.enum(['assign', 'revoke', 'suspend'], {
-    error: 'action must be assign, revoke, or suspend',
-  }),
-})
-
-const DeploymentStatusSchema = z.object({
-  worker_status: z.string().optional(),
-  pages_status: z.string().optional(),
-  last_pipeline_status: z.string().optional(),
-  last_commit_sha: z.string().optional(),
-})
-
-const OperationsMetricsSchema = z.object({
-  tenant_id: z.string().min(1, 'tenant_id is required'),
-  suite: z.string().min(1, 'suite is required'),
-  metric_date: z.string().min(1, 'metric_date is required'),
-  gross_revenue_kobo: z.number().int().default(0),
-  net_revenue_kobo: z.number().int().default(0),
-  commission_paid_kobo: z.number().int().default(0),
-  transaction_count: z.number().int().default(0),
-  active_users: z.number().int().default(0),
-  uptime_percent: z.number().min(0).max(100).default(100),
-  error_rate_percent: z.number().min(0).default(0),
-  avg_response_ms: z.number().default(0),
-  ai_tokens_used: z.number().int().default(0),
-  ai_cost_kobo: z.number().int().default(0),
-  ai_vendor: z.string().nullable().optional(),
-})
-
-const AIQuotaUpdateSchema = z.object({
-  monthly_token_limit: z.number().int().optional(),
-  daily_token_limit: z.number().int().optional(),
-  active_vendor: z.string().optional(),
-  byok_key_ref: z.string().nullable().optional(),
-})
-
-const AIQuotaResetSchema = z.object({
-  resetType: z.enum(['daily', 'monthly'], {
-    error: 'resetType must be daily or monthly',
-  }),
-})
-
-const BillingEntrySchema = z.object({
-  tenant_id: z.string().min(1, 'tenant_id is required'),
-  entry_type: z.string().min(1, 'entry_type is required'),
-  account_from: z.string().optional(),
-  account_to: z.string().optional(),
-  amount_kobo: z.number().int('amount_kobo must be an integer (Nigeria First: kobo only)'),
-  description: z.string().optional(),
-})
-
-const ModuleToggleSchema = z.object({
-  enabled: z.boolean({ required_error: 'enabled (boolean) is required' }),
-})
-
-const SettingsUpdateSchema = z.object({
-  apiRateLimit: z.number().int().optional(),
-  sessionTimeout: z.number().int().optional(),
-  maintenanceMode: z.boolean().optional(),
-  maxTenantCount: z.number().int().optional(),
-}).passthrough()
-
-const HealthAlertSchema = z.object({
-  alert_type: z.string().min(1, 'alert_type is required'),
-  severity: z.enum(['INFO', 'WARNING', 'CRITICAL'], {
-    error: 'severity must be INFO, WARNING, or CRITICAL',
-  }),
-  message: z.string().min(1, 'message is required'),
-})
-
-const ApiKeyCreateSchema = z.object({
-  name: z.string().min(2, 'API key name must be at least 2 characters'),
-})
-
-const AuditLogEntrySchema = z.object({
-  user_id: z.string().min(1, 'user_id is required'),
-  action: z.string().min(1, 'action is required'),
-  resource_type: z.string().min(1, 'resource_type is required'),
-  resource_id: z.string().optional(),
-})
-
-const HealthCheckSchema = z.object({
-  services: z.array(z.string()).optional(),
-})
-
-/**
- * parseBody — validates request body against a Zod schema.
- * Throws HTTP 400 with the first validation error message on failure.
- */
-function parseBody<T>(schema: z.ZodSchema<T>, data: unknown): T {
-  const result = schema.safeParse(data)
-  if (!result.success) {
-    const msg = result.error.issues[0]?.message ?? 'Validation error'
-    throw new HTTPException(400, { message: msg })
-  }
-  return result.data
-}
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -317,52 +84,36 @@ function generateId(prefix: string): string {
   return id
 }
 
-// ============================================================================
-// SESSION KEY HELPER — all KV lookups use the 'session:' prefix
-// ============================================================================
-function sessionKey(token: string): string {
-  return `session:${token}`
-}
-
-async function getSession(c: any): Promise<Record<string, any> | null> {
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader) return null
-  const token = authHeader.replace('Bearer ', '').trim()
-  if (!token) return null
-  try {
-    const raw = await c.env.SESSIONS_KV.get(sessionKey(token))
-    if (!raw) return null
-    const data = JSON.parse(raw)
-    if (data.expiresAt && data.expiresAt < Date.now()) {
-      await c.env.SESSIONS_KV.delete(sessionKey(token))
-      return null
-    }
-    return data
-  } catch (_) {
-    return null
-  }
-}
-
 async function getTenantId(c: any): Promise<string> {
-  const data = await getSession(c)
-  return data?.tenantId || 'super-admin'
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader) return 'super-admin'
+  const token = authHeader.replace('Bearer ', '')
+  try {
+    const session = await c.env.SESSIONS_KV.get(token)
+    if (session) {
+      const data = JSON.parse(session)
+      return data.tenantId || 'super-admin'
+    }
+  } catch (_) {}
+  return 'super-admin'
 }
 
 async function requirePermission(c: any, permission: string): Promise<boolean> {
-  const data = await getSession(c)
-  if (!data) return false
-  return (
-    data.permissions?.includes(permission) ||
-    data.permissions?.includes('read:all') ||
-    data.role === 'SUPERADMIN' ||
-    data.role === 'SUPER_ADMIN'
-  )
-}
-
-async function requireAuth(c: any): Promise<Record<string, any>> {
-  const data = await getSession(c)
-  if (!data) throw new HTTPException(401, { message: 'Unauthorized — please log in' })
-  return data
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader) return false
+  const token = authHeader.replace('Bearer ', '')
+  try {
+    const session = await c.env.SESSIONS_KV.get(token)
+    if (session) {
+      const data = JSON.parse(session)
+      return (
+        data.permissions?.includes(permission) ||
+        data.permissions?.includes('read:all') ||
+        data.role === 'SUPER_ADMIN'
+      )
+    }
+  } catch (_) {}
+  return false
 }
 
 // ============================================================================
@@ -485,17 +236,7 @@ app.post('/health/check', async (c) => {
  */
 app.post('/auth/login', async (c) => {
   try {
-    // ── Rate limiting: 5 attempts per IP per minute ─────────────────────────
-    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown'
-    const rateLimitKey = `rate:login:${ip}`
-    const currentCount = Number(await c.env.SESSIONS_KV.get(rateLimitKey) || 0)
-    if (currentCount >= 5) {
-      throw new HTTPException(429, { message: 'Too many login attempts — please wait 60 seconds' })
-    }
-    await c.env.SESSIONS_KV.put(rateLimitKey, String(currentCount + 1), { expirationTtl: 60 })
-    // ────────────────────────────────────────────────────────────────────────
-
-    const { email, password } = parseBody(LoginSchema, await c.req.json())
+    const { email, password } = await c.req.json()
 
     const result = await c.env.RBAC_DB.prepare(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.tenant_id, u.password_hash, r.name as role
@@ -512,7 +253,7 @@ app.post('/auth/login', async (c) => {
       throw new HTTPException(401, { message: 'Invalid credentials' })
     }
 
-    const isValidPassword = await bcrypt.compare(password, result.password_hash as string)
+    const isValidPassword = await bcrypt.compare(password, result.password_hash)
     if (!isValidPassword) {
       throw new HTTPException(401, { message: 'Invalid credentials' })
     }
@@ -528,18 +269,13 @@ app.post('/auth/login', async (c) => {
 
     const permissions = permissionsResult.results?.map((r: any) => r.name) || []
 
-    if (!c.env.JWT_SECRET) {
-      console.error('FATAL: JWT_SECRET environment variable is not set')
-      throw new HTTPException(500, { message: 'JWT_SECRET environment variable required' })
-    }
-
     const token = await signJWT({
       sub: result.id,
       email: result.email,
       tenantId: result.tenant_id,
       role: result.role || 'CUSTOMER',
       permissions
-    }, c.env.JWT_SECRET)
+    }, c.env.JWT_SECRET || 'default-secret-for-dev-only')
 
     await c.env.SESSIONS_KV.put(
       'session:' + token,
@@ -584,8 +320,8 @@ app.post('/auth/logout', async (c) => {
   try {
     const authHeader = c.req.header('Authorization')
     if (authHeader) {
-      const token = authHeader.replace('Bearer ', '').trim()
-      if (token) await c.env.SESSIONS_KV.delete(sessionKey(token))
+      const token = authHeader.replace('Bearer ', '')
+      await c.env.SESSIONS_KV.delete(token)
     }
     return c.json(apiResponse(true, { message: 'Logged out successfully' }))
   } catch (err) {
@@ -600,7 +336,19 @@ app.post('/auth/logout', async (c) => {
  */
 app.get('/auth/me', async (c) => {
   try {
-    const data = await requireAuth(c)
+    const authHeader = c.req.header('Authorization')
+    if (!authHeader) throw new HTTPException(401, { message: 'Unauthorized' })
+
+    const token = authHeader.replace('Bearer ', '')
+    const session = await c.env.SESSIONS_KV.get(token)
+    if (!session) throw new HTTPException(401, { message: 'Session expired' })
+
+    const data = JSON.parse(session)
+    if (data.expiresAt < Date.now()) {
+      await c.env.SESSIONS_KV.delete(token)
+      throw new HTTPException(401, { message: 'Session expired' })
+    }
+
     return c.json(
       apiResponse(true, {
         userId: data.userId,
@@ -671,7 +419,10 @@ app.post('/tenants', async (c) => {
     const hasPermission = await requirePermission(c, 'write:tenants')
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
-    const { name, email, industry, domain } = parseBody(TenantCreateSchema, await c.req.json())
+    const { name, email, industry, domain } = await c.req.json()
+    if (!name || !email || !industry) {
+      throw new HTTPException(400, { message: 'name, email, and industry are required' })
+    }
 
     const tenantId = generateId('tenant')
     await c.env.TENANTS_DB.prepare(
@@ -727,15 +478,15 @@ app.put('/tenants/:id', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const id = c.req.param('id')
-    const body = parseBody(TenantUpdateSchema, await c.req.json())
+    const body = await c.req.json()
     const allowed = ['name', 'email', 'status', 'industry', 'domain']
     const updates: string[] = []
     const params: any[] = []
 
     for (const key of allowed) {
-      if ((body as any)[key] !== undefined) {
+      if (body[key] !== undefined) {
         updates.push(`${key} = ?`)
-        params.push((body as any)[key])
+        params.push(body[key])
       }
     }
 
@@ -845,8 +596,15 @@ app.post('/partners', async (c) => {
     const hasPermission = await requirePermission(c, 'write:tenants')
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
-    const { name, email, phone, company, tier, commission_rate_percent, ndpr_consent, monthly_fee_kobo, notes } =
-      parseBody(PartnerCreateSchema, await c.req.json())
+    const body = await c.req.json()
+    const { name, email, phone, company, tier, commission_rate_percent, ndpr_consent, monthly_fee_kobo, notes } = body
+
+    if (!name || !email) {
+      throw new HTTPException(400, { message: 'name and email are required' })
+    }
+    if (!ndpr_consent) {
+      throw new HTTPException(400, { message: 'NDPR consent is required (Nigeria First invariant)' })
+    }
 
     const id = generateId('partner')
     const now = new Date().toISOString()
@@ -923,15 +681,15 @@ app.put('/partners/:id', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const id = c.req.param('id')
-    const body = parseBody(PartnerUpdateSchema, await c.req.json())
+    const body = await c.req.json()
     const allowed = ['name', 'email', 'phone', 'company', 'status', 'tier', 'commission_rate_percent', 'monthly_fee_kobo', 'notes']
     const updates: string[] = []
     const params: any[] = []
 
     for (const key of allowed) {
-      if ((body as any)[key] !== undefined) {
+      if (body[key] !== undefined) {
         updates.push(`${key} = ?`)
-        params.push((body as any)[key])
+        params.push(body[key])
       }
     }
 
@@ -992,7 +750,12 @@ app.post('/partners/:id/suites', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const partnerId = c.req.param('id')
-    const { suite, action } = parseBody(PartnerSuiteSchema, await c.req.json())
+    const { suite, action } = await c.req.json()
+
+    if (!suite || !action) throw new HTTPException(400, { message: 'suite and action are required' })
+    if (!['assign', 'revoke', 'suspend'].includes(action)) {
+      throw new HTTPException(400, { message: 'action must be assign, revoke, or suspend' })
+    }
 
     const status = action === 'assign' ? 'ACTIVE' : action === 'suspend' ? 'SUSPENDED' : 'REVOKED'
     const id = generateId('psa')
@@ -1096,8 +859,7 @@ app.put('/deployments/:id/status', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const id = c.req.param('id')
-    const { worker_status, pages_status, last_pipeline_status, last_commit_sha } =
-      parseBody(DeploymentStatusSchema, await c.req.json())
+    const { worker_status, pages_status, last_pipeline_status, last_commit_sha } = await c.req.json()
 
     const updates: string[] = []
     const params: any[] = []
@@ -1258,13 +1020,18 @@ app.post('/operations/metrics', async (c) => {
     const hasPermission = await requirePermission(c, 'write:tenants')
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
+    const body = await c.req.json()
     const {
       tenant_id, suite, metric_date,
-      gross_revenue_kobo, net_revenue_kobo, commission_paid_kobo,
-      transaction_count, active_users,
-      uptime_percent, error_rate_percent, avg_response_ms,
-      ai_tokens_used, ai_cost_kobo, ai_vendor,
-    } = parseBody(OperationsMetricsSchema, await c.req.json())
+      gross_revenue_kobo = 0, net_revenue_kobo = 0, commission_paid_kobo = 0,
+      transaction_count = 0, active_users = 0,
+      uptime_percent = 100, error_rate_percent = 0, avg_response_ms = 0,
+      ai_tokens_used = 0, ai_cost_kobo = 0, ai_vendor = null,
+    } = body
+
+    if (!tenant_id || !suite || !metric_date) {
+      throw new HTTPException(400, { message: 'tenant_id, suite, and metric_date are required' })
+    }
 
     const id = generateId('om')
     await c.env.TENANTS_DB.prepare(
@@ -1384,8 +1151,7 @@ app.put('/ai-quotas/:tenantId', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const tenantId = c.req.param('tenantId')
-    const { monthly_token_limit, daily_token_limit, active_vendor, byok_key_ref } =
-      parseBody(AIQuotaUpdateSchema, await c.req.json())
+    const { monthly_token_limit, daily_token_limit, active_vendor, byok_key_ref } = await c.req.json()
 
     const id = generateId('aiq')
     await c.env.TENANTS_DB.prepare(
@@ -1434,7 +1200,7 @@ app.post('/ai-quotas/:tenantId/reset', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const tenantId = c.req.param('tenantId')
-    const { resetType } = parseBody(AIQuotaResetSchema, await c.req.json())
+    const { resetType } = await c.req.json()
 
     if (resetType === 'daily') {
       await c.env.TENANTS_DB.prepare(
@@ -1542,8 +1308,14 @@ app.post('/billing/entry', async (c) => {
     const hasPermission = await requirePermission(c, 'write:billing')
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
-    const { tenant_id, entry_type, account_from, account_to, amount_kobo, description } =
-      parseBody(BillingEntrySchema, await c.req.json())
+    const { tenant_id, entry_type, account_from, account_to, amount_kobo, description } = await c.req.json()
+
+    if (!tenant_id || !entry_type || !amount_kobo) {
+      throw new HTTPException(400, { message: 'tenant_id, entry_type, and amount_kobo are required' })
+    }
+    if (typeof amount_kobo !== 'number' || !Number.isInteger(amount_kobo)) {
+      throw new HTTPException(400, { message: 'amount_kobo must be an integer (Nigeria First: kobo only)' })
+    }
 
     const id = generateId('le')
     await c.env.BILLING_DB.prepare(
@@ -1610,7 +1382,7 @@ app.put('/modules/:tenantId/:moduleId', async (c) => {
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
     const { tenantId, moduleId } = c.req.param()
-    const { enabled } = parseBody(ModuleToggleSchema, await c.req.json())
+    const { enabled } = await c.req.json()
 
     const id = `tm_${tenantId}_${moduleId}`
     await c.env.MODULES_DB.prepare(
@@ -1668,424 +1440,10 @@ app.put('/settings', async (c) => {
     const hasPermission = await requirePermission(c, 'write:tenants')
     if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
 
-    const body = parseBody(SettingsUpdateSchema, await c.req.json())
+    const body = await c.req.json()
+    // Store settings in KV
     await c.env.FEATURE_FLAGS_KV.put('platform:settings', JSON.stringify({ ...body, updatedAt: Date.now() }))
     return c.json(apiResponse(true, { updated: true, settings: body }))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-// ============================================================================
-// TENANT STATS ENDPOINT — GET /tenants/stats
-// ============================================================================
-
-/**
- * GET /tenants/stats
- * Returns aggregate counts and revenue across all tenants
- */
-app.get('/tenants/stats', async (c) => {
-  try {
-    await requireAuth(c)
-
-    const [counts, revenue] = await Promise.all([
-      c.env.TENANTS_DB.prepare(
-        `SELECT
-          COUNT(*) as total,
-          SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END) as active,
-          SUM(CASE WHEN status = 'SUSPENDED' THEN 1 ELSE 0 END) as suspended,
-          SUM(CASE WHEN status = 'PROVISIONING' THEN 1 ELSE 0 END) as provisioning,
-          SUM(CASE WHEN status = 'ARCHIVED' THEN 1 ELSE 0 END) as archived
-         FROM tenants WHERE deleted_at IS NULL`
-      ).first(),
-      c.env.BILLING_DB.prepare(
-        `SELECT
-          SUM(CASE WHEN entry_type = 'REVENUE' THEN amount_kobo ELSE 0 END) as total_revenue_kobo,
-          SUM(CASE WHEN entry_type = 'COMMISSION' THEN amount_kobo ELSE 0 END) as total_commission_kobo
-         FROM ledger_entries`
-      ).first(),
-    ])
-
-    return c.json(apiResponse(true, {
-      totalTenants: Number(counts?.total || 0),
-      activeTenants: Number(counts?.active || 0),
-      suspendedTenants: Number(counts?.suspended || 0),
-      provisioningTenants: Number(counts?.provisioning || 0),
-      archivedTenants: Number(counts?.archived || 0),
-      totalRevenueKobo: Number(revenue?.total_revenue_kobo || 0),
-      totalCommissionKobo: Number(revenue?.total_commission_kobo || 0),
-    }))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    console.error('Error fetching tenant stats:', err)
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-// ============================================================================
-// BILLING METRICS & COMMISSIONS — GET /billing/metrics, GET /billing/commissions
-// ============================================================================
-
-/**
- * GET /billing/metrics
- * Aggregated billing metrics for the platform
- */
-app.get('/billing/metrics', async (c) => {
-  try {
-    const hasPermission = await requirePermission(c, 'read:billing')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
-
-    const tenantId = await getTenantId(c)
-    const cacheKey = `cache:billing:metrics:${tenantId}`
-    const cached = await c.env.CACHE_KV.get(cacheKey)
-    if (cached) return c.json(apiResponse(true, JSON.parse(cached)))
-
-    const [summary, plans] = await Promise.all([
-      c.env.BILLING_DB.prepare(
-        `SELECT
-          SUM(CASE WHEN entry_type = 'REVENUE' THEN amount_kobo ELSE 0 END) as total_revenue,
-          SUM(CASE WHEN entry_type = 'COMMISSION' THEN amount_kobo ELSE 0 END) as total_commissions,
-          SUM(CASE WHEN entry_type = 'PAYOUT' THEN amount_kobo ELSE 0 END) as total_payouts,
-          COUNT(DISTINCT CASE WHEN entry_type = 'REVENUE' THEN date(created_at) END) as active_days,
-          COUNT(*) as total_entries
-         FROM ledger_entries
-         WHERE created_at > datetime('now', '-30 days')`
-      ).first(),
-      c.env.BILLING_DB.prepare(
-        `SELECT COUNT(*) as active_plans FROM billing_plans WHERE status = 'ACTIVE'`
-      ).first(),
-    ])
-
-    const metrics = {
-      totalRevenueKobo: Number(summary?.total_revenue || 0),
-      totalCommissionsKobo: Number(summary?.total_commissions || 0),
-      totalPayoutsKobo: Number(summary?.total_payouts || 0),
-      netRevenueKobo: Number(summary?.total_revenue || 0) - Number(summary?.total_payouts || 0),
-      activeBillingPlans: Number(plans?.active_plans || 0),
-      totalLedgerEntries: Number(summary?.total_entries || 0),
-      periodDays: 30,
-      generatedAt: new Date().toISOString(),
-    }
-
-    await c.env.CACHE_KV.put(cacheKey, JSON.stringify(metrics), { expirationTtl: 300 })
-    return c.json(apiResponse(true, metrics))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    console.error('Error fetching billing metrics:', err)
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-/**
- * GET /billing/commissions
- * List commissions with pagination
- */
-app.get('/billing/commissions', async (c) => {
-  try {
-    const hasPermission = await requirePermission(c, 'read:billing')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
-
-    const page = Math.max(1, Number(c.req.query('page') || 1))
-    const limit = Math.min(Number(c.req.query('limit') || 20), 100)
-    const offset = (page - 1) * limit
-    const status = c.req.query('status')
-
-    let query = `SELECT id, tenant_id, affiliate_id, level, transaction_id, amount_kobo, rate_percent, status, created_at, paid_at
-                 FROM commissions`
-    const params: any[] = []
-    if (status) {
-      query += ` WHERE status = ?`
-      params.push(status)
-    }
-    query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    params.push(limit, offset)
-
-    const [results, countResult] = await Promise.all([
-      c.env.BILLING_DB.prepare(query).bind(...params).all(),
-      c.env.BILLING_DB.prepare(
-        `SELECT COUNT(*) as total FROM commissions${status ? ' WHERE status = ?' : ''}`
-      ).bind(...(status ? [status] : [])).first(),
-    ])
-
-    return c.json(apiResponse(true, {
-      commissions: results.results,
-      pagination: { page, limit, total: Number(countResult?.total || 0) },
-    }))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    console.error('Error fetching commissions:', err)
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-// ============================================================================
-// HEALTH STATUS & ALERTS — GET /health/status, GET /health/alerts
-// ============================================================================
-
-/**
- * GET /health/status
- * Overall platform health status (aggregate across all services)
- */
-app.get('/health/status', async (c) => {
-  try {
-    const [services, unresolvedAlerts] = await Promise.all([
-      c.env.HEALTH_DB.prepare(
-        `SELECT service_name, status, uptime_percent, response_time_ms, last_check_at
-         FROM service_health ORDER BY service_name`
-      ).all(),
-      c.env.HEALTH_DB.prepare(
-        `SELECT COUNT(*) as count FROM alerts WHERE resolved = 0`
-      ).first(),
-    ])
-
-    const serviceList = services.results as any[]
-    const downCount = serviceList.filter((s: any) => s.status === 'DOWN').length
-    const degradedCount = serviceList.filter((s: any) => s.status === 'DEGRADED').length
-    const overallStatus = downCount > 0 ? 'DOWN' : degradedCount > 0 ? 'DEGRADED' : 'HEALTHY'
-    const avgUptime = serviceList.length > 0
-      ? serviceList.reduce((acc: number, s: any) => acc + (s.uptime_percent || 100), 0) / serviceList.length
-      : 100
-
-    return c.json(apiResponse(true, {
-      status: overallStatus,
-      services: serviceList.length,
-      servicesDown: downCount,
-      servicesDegraded: degradedCount,
-      avgUptimePercent: Math.round(avgUptime * 100) / 100,
-      unresolvedAlerts: Number(unresolvedAlerts?.count || 0),
-      checkedAt: new Date().toISOString(),
-    }))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    console.error('Error fetching health status:', err)
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-/**
- * GET /health/alerts
- * List system alerts with optional resolved filter
- */
-app.get('/health/alerts', async (c) => {
-  try {
-    const resolved = c.req.query('resolved')
-    const limit = Math.min(Number(c.req.query('limit') || 50), 200)
-
-    let query = `SELECT id, alert_type, severity, message, resolved, created_at, resolved_at
-                 FROM alerts`
-    const params: any[] = []
-    if (resolved === 'false' || resolved === '0') {
-      query += ` WHERE resolved = 0`
-    } else if (resolved === 'true' || resolved === '1') {
-      query += ` WHERE resolved = 1`
-    }
-    query += ` ORDER BY created_at DESC LIMIT ?`
-    params.push(limit)
-
-    const result = await c.env.HEALTH_DB.prepare(query).bind(...params).all()
-    return c.json(apiResponse(true, result.results))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    console.error('Error fetching alerts:', err)
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-/**
- * POST /health/alerts
- * Create a system alert (internal use / monitoring hooks)
- */
-app.post('/health/alerts', async (c) => {
-  try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
-
-    const { alert_type, severity, message: msg } = parseBody(HealthAlertSchema, await c.req.json())
-
-    const id = generateId('alert')
-    await c.env.HEALTH_DB.prepare(
-      `INSERT INTO alerts (id, alert_type, severity, message, resolved, created_at)
-       VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)`
-    ).bind(id, alert_type, severity, msg).run()
-
-    return c.json(apiResponse(true, { id, alert_type, severity, message: msg }), { status: 201 })
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-// ============================================================================
-// SETTINGS: API KEYS — GET/POST/DELETE /settings/api-keys
-// ============================================================================
-
-/**
- * GET /settings/api-keys
- * List API keys for the current tenant (key hash shown, not plaintext)
- */
-app.get('/settings/api-keys', async (c) => {
-  try {
-    const session = await requireAuth(c)
-    const tenantId = session.tenantId || 'super-admin'
-
-    const kvKey = `apikeys:${tenantId}`
-    const raw = await c.env.CACHE_KV.get(kvKey)
-    const keys = raw ? JSON.parse(raw) : []
-
-    return c.json(apiResponse(true, keys))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-/**
- * POST /settings/api-keys
- * Generate a new API key for the current tenant
- */
-app.post('/settings/api-keys', async (c) => {
-  try {
-    const session = await requireAuth(c)
-    const hasPermission = await requirePermission(c, 'manage:settings')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
-
-    const { name } = parseBody(ApiKeyCreateSchema, await c.req.json())
-
-    const tenantId = session.tenantId || 'super-admin'
-    const kvKey = `apikeys:${tenantId}`
-
-    // Generate a random API key
-    const keyBytes = crypto.getRandomValues(new Uint8Array(32))
-    const keyHex = Array.from(keyBytes).map(b => b.toString(16).padStart(2, '0')).join('')
-    const apiKey = `ww_${keyHex}`
-
-    // Hash for storage (never store plaintext)
-    const encoder = new TextEncoder()
-    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(apiKey))
-    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
-
-    const newEntry = {
-      id: generateId('key'),
-      name: name.trim(),
-      keyHint: `ww_...${keyHex.slice(-8)}`,
-      keyHash: hashHex,
-      tenantId,
-      createdAt: new Date().toISOString(),
-      lastUsedAt: null,
-    }
-
-    const raw = await c.env.CACHE_KV.get(kvKey)
-    const keys = raw ? JSON.parse(raw) : []
-    keys.push(newEntry)
-    await c.env.CACHE_KV.put(kvKey, JSON.stringify(keys))
-
-    // Return the plaintext key ONCE — client must store it
-    return c.json(apiResponse(true, {
-      ...newEntry,
-      apiKey, // Only returned on creation
-    }), { status: 201 })
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-/**
- * DELETE /settings/api-keys/:id
- * Revoke an API key
- */
-app.delete('/settings/api-keys/:id', async (c) => {
-  try {
-    const session = await requireAuth(c)
-    const hasPermission = await requirePermission(c, 'manage:settings')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
-
-    const keyId = c.req.param('id')
-    const tenantId = session.tenantId || 'super-admin'
-    const kvKey = `apikeys:${tenantId}`
-
-    const raw = await c.env.CACHE_KV.get(kvKey)
-    const keys = raw ? JSON.parse(raw) : []
-    const filtered = keys.filter((k: any) => k.id !== keyId)
-
-    if (filtered.length === keys.length) {
-      throw new HTTPException(404, { message: 'API key not found' })
-    }
-
-    await c.env.CACHE_KV.put(kvKey, JSON.stringify(filtered))
-    return c.json(apiResponse(true, { deleted: true, id: keyId }))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-// ============================================================================
-// AUDIT LOG — GET /settings/audit-log, POST /settings/audit-log
-// ============================================================================
-
-/**
- * GET /settings/audit-log
- * Paginated audit log entries from RBAC_DB
- */
-app.get('/settings/audit-log', async (c) => {
-  try {
-    const hasPermission = await requirePermission(c, 'read:settings')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
-
-    const page = Math.max(1, Number(c.req.query('page') || 1))
-    const limit = Math.min(Number(c.req.query('limit') || 50), 200)
-    const offset = (page - 1) * limit
-    const action = c.req.query('action')
-    const userId = c.req.query('user_id')
-
-    let query = `SELECT id, user_id, action, resource_type, resource_id, ip_address, created_at
-                 FROM audit_log WHERE 1=1`
-    const params: any[] = []
-    if (action) { query += ` AND action = ?`; params.push(action) }
-    if (userId) { query += ` AND user_id = ?`; params.push(userId) }
-    query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    params.push(limit, offset)
-
-    const [results, countResult] = await Promise.all([
-      c.env.RBAC_DB.prepare(query).bind(...params).all(),
-      c.env.RBAC_DB.prepare(
-        `SELECT COUNT(*) as total FROM audit_log`
-      ).first(),
-    ])
-
-    return c.json(apiResponse(true, {
-      entries: results.results,
-      pagination: { page, limit, total: Number(countResult?.total || 0) },
-    }))
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    console.error('Error fetching audit log:', err)
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-/**
- * POST /settings/audit-log
- * Append an audit log entry (called server-side from sensitive operations)
- * This is an internal endpoint — only accessible with write:tenants permission
- */
-app.post('/settings/audit-log', async (c) => {
-  try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
-
-    const { user_id, action, resource_type, resource_id } = parseBody(AuditLogEntrySchema, await c.req.json())
-
-    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null
-    const id = generateId('audit')
-    await c.env.RBAC_DB.prepare(
-      `INSERT INTO audit_log (id, user_id, action, resource_type, resource_id, ip_address, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-    ).bind(id, user_id, action, resource_type, resource_id || null, ip).run()
-
-    return c.json(apiResponse(true, { id, action, resource_type }), { status: 201 })
   } catch (err) {
     if (err instanceof HTTPException) throw err
     throw new HTTPException(500, { message: 'Internal server error' })

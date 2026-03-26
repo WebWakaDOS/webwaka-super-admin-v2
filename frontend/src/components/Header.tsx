@@ -9,16 +9,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Bell, Search, Settings, LogOut } from 'lucide-react';
+import { Bell, Search, Settings, LogOut, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
-export function Header() {
+interface HeaderProps {
+  onMenuToggle?: () => void;
+}
+
+export function Header({ onMenuToggle }: HeaderProps) {
   const { user, logout } = useAuth();
   const { tenants, currentTenant, switchTenant } = useTenant();
 
   return (
-    <header className="h-16 bg-card border-b border-border px-6 flex items-center justify-between">
+    <header className="h-16 bg-card border-b border-border px-4 lg:px-6 flex items-center gap-4">
+      {/* Mobile hamburger */}
+      {onMenuToggle && (
+        <button
+          onClick={onMenuToggle}
+          className="lg:hidden p-2 rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      )}
+
       {/* Search Bar */}
       <div className="flex-1 max-w-md">
         <div className="relative">
@@ -31,7 +46,7 @@ export function Header() {
       </div>
 
       {/* Right Side Actions */}
-      <div className="flex items-center gap-4 ml-auto">
+      <div className="flex items-center gap-2 sm:gap-4 ml-auto">
         {/* Language Switcher */}
         <LanguageSwitcher />
 
