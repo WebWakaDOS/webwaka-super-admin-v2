@@ -59,7 +59,7 @@ export default function Billing() {
           throw new Error('Failed to fetch billing ledger')
         }
 
-        const ledgerData = (ledgerResponse.data as LedgerEntry[]) || []
+        const ledgerData = ledgerResponse.data || []
         setLedger(ledgerData)
 
         // Calculate commission summary

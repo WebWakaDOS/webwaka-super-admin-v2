@@ -136,7 +136,7 @@ export default function Settings() {
         setLoading(true);
         const response = await apiClient.get('/settings/api-keys');
         if (response.success) {
-          setApiKeys((response.data as ApiKey[]) || []);
+          setApiKeys(response.data || []);
         } else {
           throw new Error('Failed to fetch API keys');
         }
@@ -200,7 +200,7 @@ export default function Settings() {
         name: `API Key ${new Date().toLocaleDateString()}`,
       });
       if (response.success) {
-        setApiKeys([...apiKeys, response.data as ApiKey]);
+        setApiKeys([...apiKeys, response.data]);
         toast.success('New API key generated');
       } else {
         throw new Error('Failed to generate API key');

@@ -56,8 +56,7 @@ export function useDashboardData() {
           throw new Error('Failed to fetch billing summary')
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const billingData: any = billingResponse.data
+        const billingData = billingResponse.data
         
         // Fetch tenants for distribution
         const tenantsResponse = await apiClient.get('/tenants')
@@ -65,11 +64,10 @@ export function useDashboardData() {
           throw new Error('Failed to fetch tenants')
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const tenants: any[] = (tenantsResponse.data as any)?.tenants || tenantsResponse.data || []
-        const activeTenants = tenants.filter((t) => t.status === 'ACTIVE' || t.status === 'active').length
-        const suspendedTenants = tenants.filter((t) => t.status === 'SUSPENDED' || t.status === 'suspended').length
-        const provisioningTenants = tenants.filter((t) => t.status === 'PROVISIONING' || t.status === 'provisioning').length
+        const tenants = tenantsResponse.data || []
+        const activeTenants = tenants.filter((t: any) => t.status === 'active').length
+        const suspendedTenants = tenants.filter((t: any) => t.status === 'suspended').length
+        const provisioningTenants = tenants.filter((t: any) => t.status === 'provisioning').length
 
         // Fetch modules for active modules count
         const modulesResponse = await apiClient.get('/modules')
@@ -77,23 +75,22 @@ export function useDashboardData() {
           throw new Error('Failed to fetch modules')
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const modules: any[] = (modulesResponse.data as any) || []
-        const activeModulesCount = Array.isArray(modules)
-          ? modules.filter((m) => m.status === 'active' || m.enabled).length
-          : 0
+        const modules = modulesResponse.data || []
+        const activeModulesCount = modules.filter((m: any) => m.status === 'active').length
 
         // Fetch health metrics
         const healthResponse = await apiClient.get('/health/metrics')
-        // Health may fail — treat as non-critical
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const healthMetrics: any = healthResponse.success ? healthResponse.data : null
-        const platformHealthPercentage: number = healthMetrics?.uptime ?? 99.8
+        if (!healthResponse.success) {
+          throw new Error('Failed to fetch health metrics')
+        }
+
+        const healthMetrics = healthResponse.data
+        const platformHealthPercentage = healthMetrics?.uptime || 99.8
 
         // Set metrics
         setMetrics({
-          totalRevenue: billingData?.totalRevenue ?? billingData?.totalRevenueKobo ?? 0,
-          totalCommissions: billingData?.totalCommissions ?? billingData?.totalCommissionsKobo ?? 0,
+          totalRevenue: billingData?.totalRevenue || 0,
+          totalCommissions: billingData?.totalCommissions || 0,
           activeModules: activeModulesCount,
           platformHealth: platformHealthPercentage,
           activeTenantsCount: activeTenants,
