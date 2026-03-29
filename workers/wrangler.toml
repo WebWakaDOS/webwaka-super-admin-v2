@@ -9,6 +9,8 @@ compatibility_flags = ["nodejs_compat"]
 [env.staging]
 name = "webwaka-super-admin-api-staging"
 vars = { ENVIRONMENT = "staging", LOG_LEVEL = "debug", CACHE_TTL = "300" }
+# JWT_SECRET must be set as an encrypted secret:
+#   wrangler secret put JWT_SECRET --env staging
 
 # D1 Database Bindings (Staging)
 [[env.staging.d1_databases]]
@@ -53,12 +55,19 @@ id = "ff1f220b15364b2995732ac05482c3ef"
 binding = "NOTIFICATIONS_KV"
 id = "4b5552f38e8b4db89e696d23129745d3"
 
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "REPLACE_WITH_STAGING_RATE_LIMIT_KV_ID"
+# Create with: wrangler kv:namespace create RATE_LIMIT_KV --env staging
+
 # ============================================================================
 # ENVIRONMENT: Production
 # ============================================================================
 [env.production]
 name = "webwaka-super-admin-api-prod"
 vars = { ENVIRONMENT = "production", LOG_LEVEL = "info", CACHE_TTL = "3600" }
+# JWT_SECRET must be set as an encrypted secret:
+#   wrangler secret put JWT_SECRET --env production
 
 # D1 Database Bindings (Production - Same as Staging for resource efficiency)
 [[env.production.d1_databases]]
@@ -86,7 +95,7 @@ binding = "HEALTH_DB"
 database_name = "health_prod"
 database_id = "a22ca9a2-1581-491f-90b2-826f64601c9d"
 
-# KV Namespace Bindings (Production - Same namespaces as staging for resource efficiency)
+# KV Namespace Bindings (Production)
 [[env.production.kv_namespaces]]
 binding = "SESSIONS_KV"
 id = "3f66df9f1b2f4051a39f2a4b2b02d348"
@@ -103,6 +112,11 @@ id = "ff1f220b15364b2995732ac05482c3ef"
 binding = "NOTIFICATIONS_KV"
 id = "4b5552f38e8b4db89e696d23129745d3"
 
+[[env.production.kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "REPLACE_WITH_PRODUCTION_RATE_LIMIT_KV_ID"
+# Create with: wrangler kv:namespace create RATE_LIMIT_KV --env production
+
 # ============================================================================
 # Build Configuration
 # ============================================================================
@@ -116,8 +130,6 @@ cwd = "."
 [[migrations]]
 dir = "migrations"
 tag = "v1"
-
-
 
 # ============================================================================
 # Observability
