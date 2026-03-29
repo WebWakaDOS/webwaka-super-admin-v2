@@ -15,14 +15,16 @@
  *   Settings:     GET /settings, PUT /settings
  *
  * Compliance: 7 Core Invariants (Nigeria First, Build Once Use Infinitely, etc.)
- * Date: 2026-03-21
+ * Security:   Hardened 2026-03-29 — PBKDF2 password verification, signed JWTs,
+ *             secureCORS (no wildcard in prod), KV-backed rate limiting
+ * Date: 2026-03-21 | Updated: 2026-03-29
  */
 
 import { Hono } from 'hono'
-import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { HTTPException } from 'hono/http-exception'
 import type { Context as HonoContext } from 'hono'
+import { hashPassword, verifyPassword } from './auth/password'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -41,6 +43,7 @@ type Bindings = {
   FEATURE_FLAGS_KV: KVNamespace
   CACHE_KV: KVNamespace
   NOTIFICATIONS_KV: KVNamespace
+  RATE_LIMIT_KV: KVNamespace
 
   // Environment variables
   JWT_SECRET: string
@@ -56,14 +59,44 @@ type Context = HonoContext<{ Bindings: Bindings }>
 const app = new Hono<{ Bindings: Bindings }>()
 
 app.use('*', logger())
-app.use(
-  '*',
-  cors({
-    origin: '*',
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-  })
-)
+
+// ============================================================================
+// SECURITY: Environment-aware CORS — never wildcard in production
+// ============================================================================
+const ALLOWED_ORIGINS_STAGING = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://super-admin-staging.webwaka.app',
+]
+const ALLOWED_ORIGINS_PRODUCTION = [
+  'https://admin.webwaka.app',
+  'https://super-admin.webwaka.app',
+]
+app.use('*', async (c, next) => {
+  const env = c.env.ENVIRONMENT || 'development'
+  const origin = c.req.header('Origin') || ''
+  const allowed =
+    env === 'production'
+      ? ALLOWED_ORIGINS_PRODUCTION
+      : env === 'staging'
+        ? ALLOWED_ORIGINS_STAGING
+        : true // development: allow all
+  const isAllowed = allowed === true || (Array.isArray(allowed) && allowed.includes(origin))
+  if (c.req.method === 'OPTIONS') {
+    const headers: Record<string, string> = {
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    }
+    if (isAllowed) headers['Access-Control-Allow-Origin'] = origin || '*'
+    return new Response(null, { status: 204, headers })
+  }
+  await next()
+  if (isAllowed && origin) {
+    c.res.headers.set('Access-Control-Allow-Origin', origin)
+    c.res.headers.set('Vary', 'Origin')
+  }
+})
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -82,39 +115,230 @@ function generateId(prefix: string): string {
   return id
 }
 
-async function getTenantId(c: any): Promise<string> {
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader) return 'super-admin'
-  const token = authHeader.replace('Bearer ', '')
+// ============================================================================
+// SECURITY: JWT helpers — sign and verify HS256 tokens (Workers-native)
+// ============================================================================
+async function verifyJWT(token: string, secret: string): Promise<any | null> {
   try {
-    const session = await c.env.SESSIONS_KV.get(token)
-    if (session) {
-      const data = JSON.parse(session)
-      return data.tenantId || 'super-admin'
-    }
-  } catch (_) {}
-  return 'super-admin'
+    const [headerB64, payloadB64, sigB64] = token.split('.')
+    if (!headerB64 || !payloadB64 || !sigB64) return null
+    const enc = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+    )
+    const data = enc.encode(`${headerB64}.${payloadB64}`)
+    const sig = Uint8Array.from(
+      atob(sigB64.replace(/-/g, '+').replace(/_/g, '/')),
+      (ch) => ch.charCodeAt(0)
+    )
+    const valid = await crypto.subtle.verify('HMAC', key, sig, data)
+    if (!valid) return null
+    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null
+    return payload
+  } catch {
+    return null
+  }
+}
+
+async function signJWT(
+  payload: Record<string, any>,
+  secret: string,
+  expiresInSeconds = 86400
+): Promise<string> {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const now = Math.floor(Date.now() / 1000)
+  const fullPayload = btoa(JSON.stringify({ ...payload, iat: now, exp: now + expiresInSeconds }))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const enc = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const sigBuffer = await crypto.subtle.sign('HMAC', key, enc.encode(`${header}.${fullPayload}`))
+  const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuffer)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  return `${header}.${fullPayload}.${sig}`
+}
+
+async function getAuthPayload(c: any): Promise<any | null> {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) return null
+  const token = authHeader.slice(7)
+  const secret = c.env.JWT_SECRET
+  if (!secret) return null
+  return verifyJWT(token, secret)
 }
 
 async function requirePermission(c: any, permission: string): Promise<boolean> {
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader) return false
-  const token = authHeader.replace('Bearer ', '')
-  try {
-    const session = await c.env.SESSIONS_KV.get(token)
-    if (session) {
-      const data = JSON.parse(session)
-      return (
-        data.permissions?.includes(permission) ||
-        data.permissions?.includes('read:all') ||
-        data.role === 'SUPER_ADMIN'
-      )
-    }
-  } catch (_) {}
-  return false
+  const payload = await getAuthPayload(c)
+  if (!payload) return false
+  return (
+    payload.permissions?.includes(permission) ||
+    payload.permissions?.includes('read:all') ||
+    payload.role === 'SUPER_ADMIN'
+  )
+}
+
+async function getTenantId(c: any): Promise<string> {
+  const payload = await getAuthPayload(c)
+  // tenantId ALWAYS from JWT payload — NEVER from request headers
+  return payload?.tenantId || 'super-admin'
 }
 
 // ============================================================================
+// SECURITY: KV-backed sliding-window rate limiter
+// ============================================================================
+async function checkRateLimit(
+  c: any,
+  key: string,
+  limit: number,
+  windowSeconds: number
+): Promise<{ allowed: boolean; remaining: number }> {
+  try {
+    const kvKey = `rl:${key}:${Math.floor(Date.now() / (windowSeconds * 1000))}`
+    const current = await c.env.RATE_LIMIT_KV.get(kvKey)
+    const count = current ? parseInt(current, 10) : 0
+    if (count >= limit) return { allowed: false, remaining: 0 }
+    await c.env.RATE_LIMIT_KV.put(kvKey, String(count + 1), { expirationTtl: windowSeconds })
+    return { allowed: true, remaining: limit - count - 1 }
+  } catch {
+    return { allowed: true, remaining: limit } // fail open on KV error
+  }
+}
+
+// ============================================================================
+// AUTHENTICATION ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /auth/login
+ * Authenticate user — verifies PBKDF2 password, issues signed JWT
+ * Rate limited: 10 attempts per 15 minutes per IP
+ */
+app.post('/auth/login', async (c) => {
+  try {
+    // Rate limit: 10 attempts per 15 minutes per IP
+    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown'
+    const rl = await checkRateLimit(c, `login:${ip}`, 10, 900)
+    if (!rl.allowed) {
+      throw new HTTPException(429, { message: 'Too many login attempts. Please try again later.' })
+    }
+
+    const { email, password } = await c.req.json()
+    if (!email || !password) {
+      throw new HTTPException(400, { message: 'email and password are required' })
+    }
+    if (!c.env.JWT_SECRET) {
+      console.error('FATAL: JWT_SECRET is not configured')
+      throw new HTTPException(500, { message: 'Internal server error' })
+    }
+
+    // Fetch user WITH password_hash — never expose hash in response
+    const result = await c.env.RBAC_DB.prepare(
+      `SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, u.tenant_id, r.name as role
+       FROM users u
+       LEFT JOIN user_roles ur ON u.id = ur.user_id
+       LEFT JOIN roles r ON ur.role_id = r.id
+       WHERE u.email = ? AND u.status = 'ACTIVE'`
+    )
+      .bind(email)
+      .first()
+
+    // SECURITY: always run password check to prevent timing-based user enumeration.
+    // Use a dummy hash if user not found so timing is consistent.
+    const storedHash =
+      (result?.password_hash as string) ||
+      'pbkdf2:310000:0000000000000000:0000000000000000000000000000000000000000000000000000000000000000'
+    const passwordValid = await verifyPassword(password, storedHash)
+
+    if (!result || !passwordValid) {
+      throw new HTTPException(401, { message: 'Invalid credentials' })
+    }
+
+    const permissionsResult = await c.env.RBAC_DB.prepare(
+      `SELECT p.name FROM role_permissions rp
+       JOIN permissions p ON rp.permission_id = p.id
+       WHERE rp.role_id = (SELECT id FROM roles WHERE name = ?)`
+    )
+      .bind(result.role || 'CUSTOMER')
+      .all()
+
+    const permissions = permissionsResult.results?.map((r: any) => r.name) || []
+
+    // Issue a signed JWT — stateless, no KV session storage required
+    const token = await signJWT(
+      {
+        sub: result.id as string,
+        email: result.email as string,
+        tenantId: result.tenant_id as string,
+        role: result.role as string,
+        permissions,
+      },
+      c.env.JWT_SECRET,
+      86400 // 24 hours
+    )
+
+    // Update last_login_at
+    await c.env.RBAC_DB.prepare(
+      `UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?`
+    )
+      .bind(result.id)
+      .run()
+
+    return c.json(
+      apiResponse(true, {
+        token,
+        user: {
+          id: result.id,
+          email: result.email,
+          name: `${result.first_name} ${result.last_name}`,
+          role: result.role,
+          permissions,
+          tenantId: result.tenant_id,
+        },
+      })
+    )
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Login error:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+/**
+ * POST /auth/logout
+ * Stateless JWT — client discards token. Server-side blocklist can be added later via jti.
+ */
+app.post('/auth/logout', async (c) => {
+  // With signed JWTs, logout is handled client-side by discarding the token.
+  // Future enhancement: store jti in SESSIONS_KV blocklist for immediate revocation.
+  return c.json(apiResponse(true, { message: 'Logged out successfully' }))
+})
+
+/**
+ * GET /auth/me
+ * Returns current user info from verified JWT payload
+ */
+app.get('/auth/me', async (c) => {
+  try {
+    const payload = await getAuthPayload(c)
+    if (!payload) throw new HTTPException(401, { message: 'Unauthorized' })
+    return c.json(
+      apiResponse(true, {
+        userId: payload.sub,
+        email: payload.email,
+        tenantId: payload.tenantId,
+        role: payload.role,
+        permissions: payload.permissions,
+      })
+    )
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
 // HEALTH CHECK ENDPOINTS
 // ============================================================================
 
@@ -220,129 +444,6 @@ app.post('/health/check', async (c) => {
   } catch (err) {
     if (err instanceof HTTPException) throw err
     console.error('Error running health check:', err)
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-// ============================================================================
-// AUTHENTICATION ENDPOINTS
-// ============================================================================
-
-/**
- * POST /auth/login
- * Authenticate user and return session token
- */
-app.post('/auth/login', async (c) => {
-  try {
-    const { email, password } = await c.req.json()
-
-    const result = await c.env.RBAC_DB.prepare(
-      `SELECT u.id, u.email, u.first_name, u.last_name, u.tenant_id, r.name as role
-       FROM users u
-       LEFT JOIN user_roles ur ON u.id = ur.user_id
-       LEFT JOIN roles r ON ur.role_id = r.id
-       WHERE u.email = ? AND u.status = 'ACTIVE'`
-    )
-      .bind(email)
-      .first()
-
-    if (!result) {
-      throw new HTTPException(401, { message: 'Invalid credentials' })
-    }
-
-    const permissionsResult = await c.env.RBAC_DB.prepare(
-      `SELECT p.name FROM role_permissions rp
-       JOIN permissions p ON rp.permission_id = p.id
-       WHERE rp.role_id = (SELECT id FROM roles WHERE name = ?)`
-    )
-      .bind(result.role || 'CUSTOMER')
-      .all()
-
-    const permissions = permissionsResult.results?.map((r: any) => r.name) || []
-    const token = 'jwt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-
-    await c.env.SESSIONS_KV.put(
-      token,
-      JSON.stringify({
-        userId: result.id,
-        email: result.email,
-        tenantId: result.tenant_id,
-        role: result.role,
-        permissions,
-        issuedAt: Date.now(),
-        expiresAt: Date.now() + 86400000,
-      }),
-      { expirationTtl: 86400 }
-    )
-
-    return c.json(
-      apiResponse(true, {
-        token,
-        user: {
-          id: result.id,
-          email: result.email,
-          name: `${result.first_name} ${result.last_name}`,
-          role: result.role,
-          permissions,
-          tenantId: result.tenant_id,
-        },
-      })
-    )
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
-    console.error('Login error:', err)
-    throw new HTTPException(500, { message: 'Internal server error' })
-  }
-})
-
-/**
- * POST /auth/logout
- * Invalidate session token
- */
-app.post('/auth/logout', async (c) => {
-  try {
-    const authHeader = c.req.header('Authorization')
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '')
-      await c.env.SESSIONS_KV.delete(token)
-    }
-    return c.json(apiResponse(true, { message: 'Logged out successfully' }))
-  } catch (err) {
-    console.error('Logout error:', err)
-    return c.json(apiResponse(true, { message: 'Logged out' }))
-  }
-})
-
-/**
- * GET /auth/me
- * Get current user info from session token
- */
-app.get('/auth/me', async (c) => {
-  try {
-    const authHeader = c.req.header('Authorization')
-    if (!authHeader) throw new HTTPException(401, { message: 'Unauthorized' })
-
-    const token = authHeader.replace('Bearer ', '')
-    const session = await c.env.SESSIONS_KV.get(token)
-    if (!session) throw new HTTPException(401, { message: 'Session expired' })
-
-    const data = JSON.parse(session)
-    if (data.expiresAt < Date.now()) {
-      await c.env.SESSIONS_KV.delete(token)
-      throw new HTTPException(401, { message: 'Session expired' })
-    }
-
-    return c.json(
-      apiResponse(true, {
-        userId: data.userId,
-        email: data.email,
-        tenantId: data.tenantId,
-        role: data.role,
-        permissions: data.permissions,
-      })
-    )
-  } catch (err) {
-    if (err instanceof HTTPException) throw err
     throw new HTTPException(500, { message: 'Internal server error' })
   }
 })
