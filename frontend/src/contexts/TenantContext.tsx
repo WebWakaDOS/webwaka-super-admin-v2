@@ -268,11 +268,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         setError(msg);
         throw new Error(msg);
       }
-      // Derive remaining list once so both state updates share the same array.
-      const remaining = tenants.filter((t) => t.id !== tenantId);
-      setTenants(remaining);
+      // Use functional update so setTenants reads the freshest queued state,
+      // not the closed-over snapshot. Derive the fallback from the same filter
+      // applied to the current snapshot (consistent within a single sync call).
+      setTenants((prev) => prev.filter((t) => t.id !== tenantId));
       if (currentTenant?.id === tenantId) {
-        setCurrentTenant(remaining[0] || null);
+        const next = tenants.filter((t) => t.id !== tenantId);
+        setCurrentTenant(next[0] || null);
       }
     } finally {
       setIsLoading(false);
