@@ -59,7 +59,11 @@ export default function Billing() {
           throw new Error('Failed to fetch billing ledger')
         }
 
-        const ledgerData = ledgerResponse.data || []
+        // Backend returns { entries, total, limit, offset } — extract the array
+        const rawData = ledgerResponse.data as any
+        const ledgerData: LedgerEntry[] = Array.isArray(rawData)
+          ? rawData
+          : (rawData?.entries ?? [])
         setLedger(ledgerData)
 
         // Calculate commission summary

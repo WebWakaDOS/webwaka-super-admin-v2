@@ -80,11 +80,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await apiClient.refreshToken();
         if (res.success && res.data?.token) {
           const newToken = res.data.token;
+          apiClient.setToken(newToken);
           setToken(newToken);
           localStorage.setItem('auth_token', newToken);
           scheduleTokenRefresh(newToken);
         } else {
           // Refresh failed (e.g. token already expired) — force re-login
+          apiClient.setToken(null);
           window.dispatchEvent(new CustomEvent('auth:session-expired', { detail: { status: 401 } }));
         }
       } catch (err) {
@@ -107,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
         } else {
+          apiClient.setToken(storedToken);
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
           scheduleTokenRefresh(storedToken);
@@ -127,6 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleSessionExpired = (event: Event) => {
       const status = (event as CustomEvent<{ status: number }>).detail?.status;
+
+      clearRefreshTimer();
+      apiClient.setToken(null);
 
       // Clear all local auth state immediately
       setUser(null);
@@ -175,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastLogin: new Date().toISOString(),
       };
 
+      apiClient.setToken(data.token);
       setUser(user);
       setToken(data.token);
       localStorage.setItem('auth_token', data.token);
@@ -193,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currentToken = token;
 
     clearRefreshTimer();
+    apiClient.setToken(null);
 
     // Clear local state immediately — the user is logged out from this point
     // regardless of whether the backend call succeeds
