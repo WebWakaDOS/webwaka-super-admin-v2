@@ -177,25 +177,31 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   };
 
   const createTenant = async (config: Partial<TenantConfig>): Promise<TenantConfig> => {
-    const res = await apiClient.post('/tenants', {
+    setError(null);
+    const res = await apiClient.post<ApiTenantRow>('/tenants', {
       name: config.name,
       email: config.email,
       industry: config.industry,
       domain: config.domain,
     });
     if (!res.success || !res.data) {
-      throw new Error(res.error || 'Failed to create tenant');
+      const msg = res.error || 'Failed to create tenant';
+      setError(msg);
+      throw new Error(msg);
     }
-    const newTenant = mapApiTenant(res.data);
-    setTenants((prev) => [newTenant, ...prev]);
-    return newTenant;
+    // Refresh the full list so pagination and server-assigned fields are current.
+    await fetchTenants();
+    return mapApiTenant(res.data);
   };
 
   const updateTenant = async (tenantId: string, updates: Partial<TenantConfig>) => {
+    setError(null);
     const payload = toApiUpdatePayload(updates);
     const res = await apiClient.put<ApiTenantRow>(`/tenants/${tenantId}`, payload);
     if (!res.success) {
-      throw new Error(res.error || 'Failed to update tenant');
+      const msg = res.error || 'Failed to update tenant';
+      setError(msg);
+      throw new Error(msg);
     }
     // Merge server-returned row over existing state; fall back to optimistic
     // merge if the API returns no data body (e.g. bare 200 OK).
@@ -211,9 +217,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteTenant = async (tenantId: string) => {
+    setError(null);
     const res = await apiClient.delete(`/tenants/${tenantId}`);
     if (!res.success) {
-      throw new Error(res.error || 'Failed to delete tenant');
+      const msg = res.error || 'Failed to delete tenant';
+      setError(msg);
+      throw new Error(msg);
     }
     setTenants((prev) => prev.filter((t) => t.id !== tenantId));
     if (currentTenant?.id === tenantId) {
