@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, TrendingUp, DollarSign } from 'lucide-react'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '@/lib/api'
 import { formatKoboAsNGN, calculateCommission } from '@/lib/commissionCalculator'
 import {
   BarChart,

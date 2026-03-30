@@ -29,20 +29,23 @@ export function calculateCommission(transactionAmount: number): CommissionBreakd
   // Ensure input is integer kobo
   const amount = Math.floor(transactionAmount)
 
+  // Each level earns its stated percentage of the original transaction amount
+  // (not of the parent level's commission) so that all levels receive meaningful payouts.
+
   // Level 1: 5% of transaction
   const level1 = Math.floor(amount * 0.05)
 
-  // Level 2: 3% of Level 1
-  const level2 = Math.floor(level1 * 0.03)
+  // Level 2: 3% of transaction
+  const level2 = Math.floor(amount * 0.03)
 
-  // Level 3: 2% of Level 2
-  const level3 = Math.floor(level2 * 0.02)
+  // Level 3: 2% of transaction
+  const level3 = Math.floor(amount * 0.02)
 
-  // Level 4: 1% of Level 3
-  const level4 = Math.floor(level3 * 0.01)
+  // Level 4: 1% of transaction
+  const level4 = Math.floor(amount * 0.01)
 
-  // Level 5: 0.5% of Level 4
-  const level5 = Math.floor(level4 * 0.005)
+  // Level 5: 0.5% of transaction
+  const level5 = Math.floor(amount * 0.005)
 
   // Total commission
   const total = level1 + level2 + level3 + level4 + level5

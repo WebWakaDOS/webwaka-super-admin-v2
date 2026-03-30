@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiClient, BillingData } from '@/lib/api-client';
+import { apiClient, BillingData } from '@/lib/api';
 
 interface BillingState {
   data: BillingData | null;

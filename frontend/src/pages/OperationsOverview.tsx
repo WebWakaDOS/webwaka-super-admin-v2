@@ -31,7 +31,7 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '@/lib/api'
 
 // ============================================================================
 // TYPES

@@ -1,245 +1,289 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle } from "lucide-react";
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
+} from "recharts";
+import { apiClient } from '@/lib/api';
+
+interface SuiteMetric {
+  suite: string;
+  total_revenue_kobo: number;
+  total_transactions: number;
+  avg_uptime: number;
+  avg_error_rate: number;
+  total_ai_tokens: number;
+}
+
+interface OperationsSummary {
+  suiteMetrics: SuiteMetric[];
+  activeTenants: number;
+  activePartners: number;
+  generatedAt: string;
+}
+
+interface DailyMetric {
+  metric_date: string;
+  suite: string;
+  gross_revenue_kobo: number;
+  transaction_count: number;
+  active_users: number;
+  avg_response_ms: number;
+}
+
+const SUITE_COLORS: Record<string, string> = {
+  civic: '#3b82f6',
+  commerce: '#10b981',
+  transport: '#f59e0b',
+  fintech: '#ef4444',
+  realestate: '#8b5cf6',
+  education: '#06b6d4',
+};
+
+function formatKoboAsNaira(kobo: number): string {
+  return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(kobo / 100);
+}
+
+function groupByMonth(metrics: DailyMetric[]) {
+  const months: Record<string, { transactions: number; revenueKobo: number; users: number }> = {};
+  for (const m of metrics) {
+    const month = m.metric_date?.slice(0, 7) || '';
+    if (!months[month]) months[month] = { transactions: 0, revenueKobo: 0, users: 0 };
+    months[month].transactions += m.transaction_count || 0;
+    months[month].revenueKobo += m.gross_revenue_kobo || 0;
+    months[month].users += m.active_users || 0;
+  }
+  return Object.entries(months)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, v]) => ({
+      month: new Date(month + '-01').toLocaleString('en-NG', { month: 'short' }),
+      transactions: v.transactions,
+      revenueNaira: Math.round(v.revenueKobo / 100),
+      users: v.users,
+    }));
+}
 
 const Analytics = () => {
-  // Sample data for analytics
-  const userGrowthData = [
-    { month: "Jan", users: 400, activeUsers: 240 },
-    { month: "Feb", users: 520, activeUsers: 350 },
-    { month: "Mar", users: 680, activeUsers: 480 },
-    { month: "Apr", users: 850, activeUsers: 620 },
-    { month: "May", users: 1050, activeUsers: 800 },
-    { month: "Jun", users: 1200, activeUsers: 950 },
-  ];
+  const [summary, setSummary] = useState<OperationsSummary | null>(null);
+  const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const transactionData = [
-    { month: "Jan", transactions: 1200, amount: 45000 },
-    { month: "Feb", transactions: 1500, amount: 52000 },
-    { month: "Mar", transactions: 1800, amount: 61000 },
-    { month: "Apr", transactions: 2100, amount: 71000 },
-    { month: "May", transactions: 2400, amount: 82000 },
-    { month: "Jun", transactions: 2800, amount: 95000 },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [summaryRes, metricsRes] = await Promise.all([
+          apiClient.get<OperationsSummary>('/operations/summary'),
+          apiClient.get<DailyMetric[]>('/operations/metrics'),
+        ]);
+        if (summaryRes.success && summaryRes.data) setSummary(summaryRes.data);
+        if (metricsRes.success && metricsRes.data) setDailyMetrics(Array.isArray(metricsRes.data) ? metricsRes.data : []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load analytics');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
-  const moduleUsageData = [
-    { name: "Commerce", value: 35, color: "#3b82f6" },
-    { name: "Transportation", value: 25, color: "#10b981" },
-    { name: "Fintech", value: 20, color: "#f59e0b" },
-    { name: "Real Estate", value: 15, color: "#ef4444" },
-    { name: "Education", value: 5, color: "#8b5cf6" },
-  ];
+  const monthlyData = groupByMonth(dailyMetrics);
 
-  const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+  const moduleUsageData = (summary?.suiteMetrics || []).map((m) => ({
+    name: m.suite.charAt(0).toUpperCase() + m.suite.slice(1),
+    suite: m.suite,
+    value: m.total_transactions || 0,
+    revenue: m.total_revenue_kobo,
+    uptime: m.avg_uptime,
+  }));
+  const totalTx = moduleUsageData.reduce((s, m) => s + m.value, 0);
+  const moduleUsagePct = moduleUsageData.map((m) => ({
+    ...m,
+    pct: totalTx > 0 ? Math.round((m.value / totalTx) * 100) : 0,
+  }));
+
+  const totalRevenue = (summary?.suiteMetrics || []).reduce((s, m) => s + (m.total_revenue_kobo || 0), 0);
+  const totalTransactions = (summary?.suiteMetrics || []).reduce((s, m) => s + (m.total_transactions || 0), 0);
+  const avgUptime = (summary?.suiteMetrics || []).length > 0
+    ? summary!.suiteMetrics.reduce((s, m) => s + (m.avg_uptime || 0), 0) / summary!.suiteMetrics.length
+    : 0;
+  const avgResponse = dailyMetrics.length > 0
+    ? Math.round(dailyMetrics.reduce((s, m) => s + (m.avg_response_ms || 0), 0) / dailyMetrics.length)
+    : 0;
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+          <p className="text-muted-foreground mt-2">Platform performance metrics and usage analytics</p>
+        </div>
+        <div className="flex items-center gap-2 text-red-600">
+          <AlertCircle className="h-5 w-5" />
+          <span>{error}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-muted-foreground mt-2">
-          Platform performance metrics and usage analytics
-        </p>
+        <p className="text-muted-foreground mt-2">Platform performance metrics and usage analytics</p>
       </div>
 
-      {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Users
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Tenants</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12,450</div>
-            <p className="text-xs text-green-600 mt-1">+12% from last month</p>
+            {loading ? <Skeleton className="h-8 w-20" /> : (
+              <div className="text-2xl font-bold">{(summary?.activeTenants || 0).toLocaleString()}</div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Sessions
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Transactions (30d)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3,240</div>
-            <p className="text-xs text-green-600 mt-1">+8% from last month</p>
+            {loading ? <Skeleton className="h-8 w-24" /> : (
+              <div className="text-2xl font-bold">{totalTransactions.toLocaleString()}</div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Transactions
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Revenue (30d)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">28,450</div>
-            <p className="text-xs text-green-600 mt-1">+15% from last month</p>
+            {loading ? <Skeleton className="h-8 w-28" /> : (
+              <div className="text-xl font-bold">{formatKoboAsNaira(totalRevenue)}</div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Avg Response Time
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Response Time</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">145ms</div>
-            <p className="text-xs text-red-600 mt-1">+5% from last month</p>
+            {loading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold">{avgResponse > 0 ? `${avgResponse}ms` : '—'}</div>
+            )}
+            {avgUptime > 0 && (
+              <p className="text-xs text-green-600 mt-1">{avgUptime.toFixed(2)}% uptime</p>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Growth */}
         <Card>
           <CardHeader>
-            <CardTitle>User Growth</CardTitle>
-            <CardDescription>
-              Total and active users over the last 6 months
-            </CardDescription>
+            <CardTitle>Transaction Volume</CardTitle>
+            <CardDescription>Daily transaction count over the last 30 days</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={userGrowthData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="users"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  name="Total Users"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="activeUsers"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  name="Active Users"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {loading ? <Skeleton className="h-72 w-full" /> : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="transactions" fill="#3b82f6" name="Transactions" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
-        {/* Transaction Analytics */}
         <Card>
           <CardHeader>
-            <CardTitle>Transaction Analytics</CardTitle>
-            <CardDescription>
-              Transaction count and volume over time
-            </CardDescription>
+            <CardTitle>Revenue Trend</CardTitle>
+            <CardDescription>Gross revenue (₦) over the last 30 days</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={transactionData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
-                <Tooltip />
-                <Legend />
-                <Bar
-                  yAxisId="left"
-                  dataKey="transactions"
-                  fill="#3b82f6"
-                  name="Transactions"
-                />
-                <Bar
-                  yAxisId="right"
-                  dataKey="amount"
-                  fill="#10b981"
-                  name="Amount (₦)"
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            {loading ? <Skeleton className="h-72 w-full" /> : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(v: number) => `₦${v.toLocaleString()}`} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="revenueNaira"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    name="Revenue (₦)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Module Usage */}
       <Card>
         <CardHeader>
-          <CardTitle>Module Usage Distribution</CardTitle>
-          <CardDescription>
-            Percentage of transactions by module
-          </CardDescription>
+          <CardTitle>Suite Usage Distribution</CardTitle>
+          <CardDescription>Transaction share by suite (last 30 days)</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={moduleUsageData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name} ${value}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {moduleUsageData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+          {loading ? <Skeleton className="h-72 w-full" /> : moduleUsagePct.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">No suite data available yet</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={moduleUsagePct}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, pct }) => pct > 0 ? `${name} ${pct}%` : ''}
+                    outerRadius={80}
+                    dataKey="value"
+                  >
+                    {moduleUsagePct.map((m) => (
+                      <Cell key={m.suite} fill={SUITE_COLORS[m.suite] || '#6b7280'} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => v.toLocaleString()} />
+                </PieChart>
+              </ResponsiveContainer>
 
-            <div className="space-y-4">
-              {moduleUsageData.map((module, index) => (
-                <div key={module.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <span className="font-medium">{module.name}</span>
+              <div className="space-y-3">
+                {moduleUsagePct.map((m) => (
+                  <div key={m.suite} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: SUITE_COLORS[m.suite] || '#6b7280' }}
+                      />
+                      <span className="font-medium capitalize">{m.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold">{m.pct}%</span>
+                      <p className="text-xs text-muted-foreground">{m.value.toLocaleString()} txns</p>
+                    </div>
                   </div>
-                  <span className="text-muted-foreground">{module.value}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>
-            Latest platform events and activities
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[
-              { time: "2 hours ago", event: "New tenant registered", details: "TechCorp Nigeria" },
-              { time: "4 hours ago", event: "Module enabled", details: "Commerce Core on RetailHub Lagos" },
-              { time: "6 hours ago", event: "Payment processed", details: "₦125,000 from TechCorp Nigeria" },
-              { time: "8 hours ago", event: "System health alert", details: "Message Queue degraded to 98.5%" },
-              { time: "1 day ago", event: "Backup completed", details: "Full system backup completed successfully" },
-            ].map((activity, index) => (
-              <div key={index} className="flex items-start gap-4 pb-4 border-b last:border-b-0 last:pb-0">
-                <div className="text-xs text-muted-foreground whitespace-nowrap pt-1">
-                  {activity.time}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{activity.event}</p>
-                  <p className="text-xs text-muted-foreground">{activity.details}</p>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

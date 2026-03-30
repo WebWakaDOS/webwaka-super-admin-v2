@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiClient, ServiceStatus, SystemMetrics } from '@/lib/api-client';
+import { apiClient, ServiceStatus, SystemMetrics } from '@/lib/api';
 
 interface HealthData {
   services: ServiceStatus[];

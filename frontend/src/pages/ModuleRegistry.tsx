@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, Zap, Package } from 'lucide-react'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '@/lib/api'
 import { toast } from 'sonner'
 
 interface Module {

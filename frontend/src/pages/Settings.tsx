@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { SettingsIcon, Lock, Bell, Eye, Key, Trash2, Copy, Check } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient } from '@/lib/api';
 
 interface ApiKey {
   id: string;

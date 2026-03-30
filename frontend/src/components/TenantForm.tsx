@@ -24,7 +24,7 @@ export interface TenantFormData {
   name: string
   email: string
   status: 'active' | 'suspended' | 'provisioning'
-  plan: string
+  plan: 'starter' | 'professional' | 'enterprise'
 }
 
 interface TenantFormProps {
@@ -134,7 +134,7 @@ export function TenantForm({
             <Label htmlFor="plan">Plan</Label>
             <Select
               value={formData.plan}
-              onValueChange={(value) => setFormData({ ...formData, plan: value })}
+              onValueChange={(value) => setFormData({ ...formData, plan: value as TenantFormData['plan'] })}
               disabled={isLoading}
             >
               <SelectTrigger id="plan">

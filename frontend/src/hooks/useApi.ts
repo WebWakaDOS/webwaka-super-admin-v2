@@ -26,6 +26,12 @@ export function useApi<T>(
   const [isStale, setIsStale] = useState(false)
   const fetchFnRef = useRef(fetchFn)
   fetchFnRef.current = fetchFn
+  // Refs for values read inside the callback to avoid stale closures without
+  // needing to add them to the dependency array (which would cause loops).
+  const isStaleRef = useRef(isStale)
+  isStaleRef.current = isStale
+  const onErrorRef = useRef(options.onError)
+  onErrorRef.current = options.onError
 
   const fetch = useCallback(async () => {
     if (options.skip) return
@@ -47,7 +53,8 @@ export function useApi<T>(
       }
     }
 
-    if (!isStale) setLoading(true)
+    // Use ref so this reads the current value instead of the captured-at-creation value
+    if (!isStaleRef.current) setLoading(true)
 
     try {
       const result = await fetchFnRef.current()
@@ -61,7 +68,7 @@ export function useApi<T>(
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err))
       setError(e)
-      options.onError?.(e)
+      onErrorRef.current?.(e)
     } finally {
       setLoading(false)
     }

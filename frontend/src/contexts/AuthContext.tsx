@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { apiClient } from '@/lib/api';
 
 // Types
 export type UserRole = 'super_admin' | 'partner' | 'support' | 'tenant_admin';
@@ -38,13 +39,59 @@ function getAPIBase() {
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   return isLocalhost ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev';
 }
-const API_BASE = getAPIBase();
+
+// Decode JWT payload without verifying signature (frontend only).
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const payloadB64 = token.split('.')[1];
+    if (!payloadB64) return null;
+    const json = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
 
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending refresh timer
+  const clearRefreshTimer = () => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+  };
+
+  // Schedule a token refresh so the new token arrives before the old one expires.
+  // Fires (expiry - 60 min) from now, or immediately if < 60 min left.
+  const scheduleTokenRefresh = (currentToken: string) => {
+    clearRefreshTimer();
+    const payload = decodeJwtPayload(currentToken);
+    if (!payload?.exp) return;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const msUntilRefresh = Math.max(0, (payload.exp - nowSec - 3600) * 1000);
+    refreshTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await apiClient.refreshToken();
+        if (res.success && res.data?.token) {
+          const newToken = res.data.token;
+          setToken(newToken);
+          localStorage.setItem('auth_token', newToken);
+          scheduleTokenRefresh(newToken);
+        } else {
+          // Refresh failed (e.g. token already expired) — force re-login
+          window.dispatchEvent(new CustomEvent('auth:session-expired', { detail: { status: 401 } }));
+        }
+      } catch (err) {
+        console.error('Token refresh error:', err);
+      }
+    }, msUntilRefresh);
+  };
 
   // Initialize auth from localStorage
   useEffect(() => {
@@ -53,8 +100,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (storedToken && storedUser) {
       try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        const payload = decodeJwtPayload(storedToken);
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (payload?.exp && payload.exp <= nowSec) {
+          // Token already expired — clear and force login
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+        } else {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+          scheduleTokenRefresh(storedToken);
+        }
       } catch (error) {
         console.error('Failed to restore auth state:', error);
         localStorage.removeItem('auth_token');
@@ -63,6 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setIsLoading(false);
+    return () => clearRefreshTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle automatic session expiry triggered by 401/403 responses in the API client
@@ -121,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(data.token);
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('auth_user', JSON.stringify(user));
+      scheduleTokenRefresh(data.token);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -132,6 +191,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     // Capture current token before clearing state
     const currentToken = token;
+
+    clearRefreshTimer();
 
     // Clear local state immediately — the user is logged out from this point
     // regardless of whether the backend call succeeds

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import Billing from '@/pages/Billing'
-import * as apiClient from '@/lib/api-client'
+import * as apiClient from '@/lib/api'
 
 // Mock apiClient
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@/lib/api', () => ({
   apiClient: {
     get: vi.fn(),
     post: vi.fn(),

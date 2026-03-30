@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiClient, TenantStats } from '@/lib/api-client';
+import { apiClient, TenantStats } from '@/lib/api';
 
 interface TenantState {
   stats: TenantStats | null;

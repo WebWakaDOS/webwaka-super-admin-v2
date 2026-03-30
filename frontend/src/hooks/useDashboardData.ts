@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '@/lib/api'
 
 export interface DashboardMetrics {
   totalRevenue: number

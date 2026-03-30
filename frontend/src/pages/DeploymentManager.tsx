@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, RefreshCw, CheckCircle2, XCircle, Clock, GitBranch, Globe } from 'lucide-react'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '@/lib/api'
 
 // ============================================================================
 // TYPES

@@ -1,12 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiClient } from '@/lib/api';
 
-// Types
 export interface TenantConfig {
   id: string;
   name: string;
+  email?: string;
   domain: string;
   status: 'active' | 'suspended' | 'provisioning' | 'archived';
   plan: 'starter' | 'professional' | 'enterprise';
+  industry?: string;
   enabledModules: string[];
   branding: {
     logo?: string;
@@ -31,6 +33,7 @@ export interface TenantContextType {
   currentTenant: TenantConfig | null;
   tenants: TenantConfig[];
   isLoading: boolean;
+  error: string | null;
   switchTenant: (tenantId: string) => void;
   createTenant: (config: Partial<TenantConfig>) => Promise<TenantConfig>;
   updateTenant: (tenantId: string, updates: Partial<TenantConfig>) => Promise<void>;
@@ -38,83 +41,78 @@ export interface TenantContextType {
   fetchTenants: () => Promise<void>;
 }
 
-// Create context
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
-// Provider component
+function normaliseStatus(raw: string): TenantConfig['status'] {
+  const s = raw.toLowerCase();
+  if (s === 'active') return 'active';
+  if (s === 'suspended') return 'suspended';
+  if (s === 'provisioning') return 'provisioning';
+  if (s === 'archived') return 'archived';
+  return 'active';
+}
+
+function normalisePlan(raw: string | undefined): TenantConfig['plan'] {
+  const p = (raw || 'starter').toLowerCase();
+  if (p === 'professional' || p === 'pro') return 'professional';
+  if (p === 'enterprise') return 'enterprise';
+  return 'starter';
+}
+
+function mapApiTenant(raw: any): TenantConfig {
+  return {
+    id: raw.id,
+    name: raw.name,
+    email: raw.email,
+    domain: raw.domain || `${raw.id}.webwaka.app`,
+    status: normaliseStatus(raw.status || 'active'),
+    plan: normalisePlan(raw.plan),
+    industry: raw.industry,
+    enabledModules: raw.enabled_modules ? JSON.parse(raw.enabled_modules) : [],
+    branding: raw.branding ? (typeof raw.branding === 'string' ? JSON.parse(raw.branding) : raw.branding) : {},
+    settings: {
+      timezone: raw.timezone || 'Africa/Lagos',
+      currency: raw.currency || 'NGN',
+      language: raw.language || 'en',
+    },
+    createdAt: raw.created_at || raw.createdAt || new Date().toISOString(),
+    updatedAt: raw.updated_at || raw.updatedAt || new Date().toISOString(),
+    owner: raw.owner || {
+      id: raw.owner_id || '',
+      email: raw.email || '',
+      name: raw.owner_name || raw.name || '',
+    },
+  };
+}
+
 export function TenantProvider({ children }: { children: ReactNode }) {
   const [currentTenant, setCurrentTenant] = useState<TenantConfig | null>(null);
   const [tenants, setTenants] = useState<TenantConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load tenants on mount
   useEffect(() => {
     fetchTenants();
   }, []);
 
   const fetchTenants = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      // Mock data for demonstration
-      const mockTenants: TenantConfig[] = [
-        {
-          id: 'tenant_001',
-          name: 'Retail Store A',
-          domain: 'retail-a.webwaka.app',
-          status: 'active',
-          plan: 'professional',
-          enabledModules: ['COM-1', 'COM-2', 'COM-3', 'XCT-1', 'XCT-2'],
-          branding: {
-            logo: undefined,
-            primaryColor: '#3B82F6',
-            secondaryColor: '#10B981',
-          },
-          settings: {
-            timezone: 'Africa/Lagos',
-            currency: 'NGN',
-            language: 'en',
-          },
-          createdAt: '2026-01-15T10:00:00Z',
-          updatedAt: '2026-03-15T12:00:00Z',
-          owner: {
-            id: 'user_101',
-            email: 'owner@retaila.com',
-            name: 'John Doe',
-          },
-        },
-        {
-          id: 'tenant_002',
-          name: 'Transport Company B',
-          domain: 'transport-b.webwaka.app',
-          status: 'active',
-          plan: 'enterprise',
-          enabledModules: ['TRN-1', 'TRN-2', 'TRN-3', 'TRN-4', 'LOG-1', 'LOG-2'],
-          branding: {
-            logo: undefined,
-            primaryColor: '#DC2626',
-            secondaryColor: '#F59E0B',
-          },
-          settings: {
-            timezone: 'Africa/Lagos',
-            currency: 'NGN',
-            language: 'en',
-          },
-          createdAt: '2026-02-01T08:30:00Z',
-          updatedAt: '2026-03-14T15:45:00Z',
-          owner: {
-            id: 'user_102',
-            email: 'owner@transportb.com',
-            name: 'Jane Smith',
-          },
-        },
-      ];
+      const res = await apiClient.get<{ tenants: any[]; pagination: any }>('/tenants?limit=100');
+      if (res.success && res.data) {
+        const mapped = (res.data.tenants || []).map(mapApiTenant);
+        setTenants(mapped);
 
-      setTenants(mockTenants);
-      if (mockTenants.length > 0) {
-        setCurrentTenant(mockTenants[0]);
+        const savedId = localStorage.getItem('current_tenant_id');
+        const found = savedId ? mapped.find((t) => t.id === savedId) : null;
+        setCurrentTenant(found || mapped[0] || null);
+      } else {
+        setError(res.error || 'Failed to load tenants');
       }
-    } catch (error) {
-      console.error('Failed to fetch tenants:', error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load tenants');
+      console.error('Failed to fetch tenants:', err);
     } finally {
       setIsLoading(false);
     }
@@ -129,54 +127,45 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   };
 
   const createTenant = async (config: Partial<TenantConfig>): Promise<TenantConfig> => {
-    const newTenant: TenantConfig = {
-      id: 'tenant_' + Date.now(),
-      name: config.name || 'New Tenant',
-      domain: config.domain || `tenant-${Date.now()}.webwaka.app`,
-      status: 'provisioning',
-      plan: config.plan || 'starter',
-      enabledModules: config.enabledModules || [],
-      branding: config.branding || {},
-      settings: config.settings || {
-        timezone: 'Africa/Lagos',
-        currency: 'NGN',
-        language: 'en',
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      owner: config.owner || {
-        id: 'user_unknown',
-        email: 'unknown@example.com',
-        name: 'Unknown',
-      },
-    };
-
-    setTenants([...tenants, newTenant]);
+    const res = await apiClient.post('/tenants', {
+      name: config.name,
+      email: config.email,
+      industry: config.industry,
+      domain: config.domain,
+    });
+    if (!res.success || !res.data) {
+      throw new Error(res.error || 'Failed to create tenant');
+    }
+    const newTenant = mapApiTenant(res.data);
+    setTenants((prev) => [newTenant, ...prev]);
     return newTenant;
   };
 
   const updateTenant = async (tenantId: string, updates: Partial<TenantConfig>) => {
-    setTenants(
-      tenants.map((t) =>
-        t.id === tenantId
-          ? { ...t, ...updates, updatedAt: new Date().toISOString() }
-          : t
+    const res = await apiClient.put(`/tenants/${tenantId}`, updates);
+    if (!res.success) {
+      throw new Error(res.error || 'Failed to update tenant');
+    }
+    setTenants((prev) =>
+      prev.map((t) =>
+        t.id === tenantId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
       )
     );
-
     if (currentTenant?.id === tenantId) {
-      setCurrentTenant({
-        ...currentTenant,
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      });
+      setCurrentTenant((prev) =>
+        prev ? { ...prev, ...updates, updatedAt: new Date().toISOString() } : null
+      );
     }
   };
 
   const deleteTenant = async (tenantId: string) => {
-    setTenants(tenants.filter((t) => t.id !== tenantId));
+    const res = await apiClient.delete(`/tenants/${tenantId}`);
+    if (!res.success) {
+      throw new Error(res.error || 'Failed to delete tenant');
+    }
+    setTenants((prev) => prev.filter((t) => t.id !== tenantId));
     if (currentTenant?.id === tenantId) {
-      setCurrentTenant(tenants[0] || null);
+      setCurrentTenant(tenants.find((t) => t.id !== tenantId) || null);
     }
   };
 
@@ -184,6 +173,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     currentTenant,
     tenants,
     isLoading,
+    error,
     switchTenant,
     createTenant,
     updateTenant,
@@ -196,7 +186,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Hook to use tenant context
 export function useTenant() {
   const context = useContext(TenantContext);
   if (context === undefined) {

@@ -37,14 +37,14 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, Plus, Users, TrendingUp, Shield, Globe } from 'lucide-react'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '@/lib/api'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 type PartnerStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CHURNED'
-type PartnerTier = 'STARTER' | 'GROWTH' | 'ENTERPRISE'
+type PartnerTier = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'
 type SuiteName = 'civic' | 'commerce' | 'transport' | 'fintech' | 'realestate' | 'education'
 
 interface Partner {
@@ -86,7 +86,7 @@ function statusBadgeVariant(status: PartnerStatus): 'default' | 'secondary' | 'd
 function tierBadgeColor(tier: PartnerTier): string {
   switch (tier) {
     case 'ENTERPRISE': return 'bg-purple-100 text-purple-800'
-    case 'GROWTH': return 'bg-blue-100 text-blue-800'
+    case 'PROFESSIONAL': return 'bg-blue-100 text-blue-800'
     case 'STARTER': return 'bg-gray-100 text-gray-800'
   }
 }
@@ -187,7 +187,7 @@ function OnboardingForm({ onSuccess }: OnboardingFormProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="STARTER">Starter</SelectItem>
-              <SelectItem value="GROWTH">Growth</SelectItem>
+              <SelectItem value="PROFESSIONAL">Professional</SelectItem>
               <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
             </SelectContent>
           </Select>
@@ -464,7 +464,7 @@ export default function PartnerManagement() {
               <SelectContent>
                 <SelectItem value="ALL">All Tiers</SelectItem>
                 <SelectItem value="STARTER">Starter</SelectItem>
-                <SelectItem value="GROWTH">Growth</SelectItem>
+                <SelectItem value="PROFESSIONAL">Professional</SelectItem>
                 <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
               </SelectContent>
             </Select>

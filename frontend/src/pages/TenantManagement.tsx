@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { TenantForm, TenantFormData } from '@/components/TenantForm'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '@/lib/api'
 import { toast } from 'sonner'
 
 interface Tenant {

@@ -477,6 +477,35 @@ app.post('/auth/login', async (c) => {
 })
 
 /**
+ * POST /auth/refresh
+ * Exchange a valid (non-expired) JWT for a new one with a fresh 24-hour expiry.
+ * The original token must still be valid to prevent refresh after expiry.
+ */
+app.post('/auth/refresh', async (c) => {
+  try {
+    const payload = await getAuthPayload(c)
+    if (!payload) throw new HTTPException(401, { message: 'Unauthorized' })
+
+    const newToken = await signJWT(
+      {
+        sub: payload.sub,
+        email: payload.email,
+        tenantId: payload.tenantId,
+        role: payload.role,
+        permissions: payload.permissions,
+      },
+      c.env.JWT_SECRET,
+      86400 // 24 hours
+    )
+
+    return c.json(apiResponse(true, { token: newToken }))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+/**
  * POST /auth/logout
  * Stateless JWT — client discards token. Server-side blocklist can be added later via jti.
  */
@@ -1456,17 +1485,32 @@ app.get('/billing/ledger', async (c) => {
     await requirePermission(c, 'read:billing')
 
     const tenantId = await getTenantId(c)
-    const result = await c.env.BILLING_DB.prepare(
-      `SELECT id, entry_type, account_from, account_to, amount_kobo, description, created_at
-       FROM ledger_entries
-       WHERE tenant_id = ?
-       ORDER BY created_at DESC
-       LIMIT 100`
-    )
-      .bind(tenantId)
-      .all()
+    const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200)
+    const offset = Math.max(parseInt(c.req.query('offset') || '0', 10), 0)
 
-    return c.json(apiResponse(true, result.results))
+    const [rows, countRow] = await Promise.all([
+      c.env.BILLING_DB.prepare(
+        `SELECT id, entry_type, account_from, account_to, amount_kobo, description, created_at
+         FROM ledger_entries
+         WHERE tenant_id = ?
+         ORDER BY created_at DESC
+         LIMIT ? OFFSET ?`
+      )
+        .bind(tenantId, limit, offset)
+        .all(),
+      c.env.BILLING_DB.prepare(
+        `SELECT COUNT(*) as total FROM ledger_entries WHERE tenant_id = ?`
+      )
+        .bind(tenantId)
+        .first<{ total: number }>(),
+    ])
+
+    return c.json(apiResponse(true, {
+      entries: rows.results,
+      total: countRow?.total ?? 0,
+      limit,
+      offset,
+    }))
   } catch (err) {
     if (err instanceof HTTPException) throw err
     console.error('Error fetching ledger:', err)
@@ -1480,6 +1524,7 @@ app.get('/billing/ledger', async (c) => {
  */
 app.get('/billing/summary', async (c) => {
   try {
+    await requirePermission(c, 'read:billing')
     const tenantId = await getTenantId(c)
     const cacheKey = `cache:tenant:${tenantId}:ledger:summary`
 

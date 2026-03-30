@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TenantManagement from '@/pages/TenantManagement'
-import * as apiClient from '@/lib/api-client'
+import * as apiClient from '@/lib/api'
 
 // Mock the API client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@/lib/api', () => ({
   apiClient: {
     get: vi.fn(),
     post: vi.fn(),
