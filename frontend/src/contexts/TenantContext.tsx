@@ -1,6 +1,33 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient } from '@/lib/api';
 
+// Shape returned by GET /tenants (workers/src/index.ts)
+interface ApiTenantRow {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  industry?: string;
+  domain?: string;
+  tenant_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Optional enriched fields that may be present in future API versions
+  plan?: string;
+  enabled_modules?: string;
+  branding?: string | Record<string, unknown>;
+  timezone?: string;
+  currency?: string;
+  language?: string;
+  owner_id?: string;
+  owner_name?: string;
+}
+
+interface TenantsApiResponse {
+  tenants: ApiTenantRow[];
+  pagination: { page: number; limit: number; total: number };
+}
+
 export interface TenantConfig {
   id: string;
   name: string;
@@ -59,28 +86,39 @@ function normalisePlan(raw: string | undefined): TenantConfig['plan'] {
   return 'starter';
 }
 
-function mapApiTenant(raw: any): TenantConfig {
+function mapApiTenant(raw: ApiTenantRow): TenantConfig {
+  const branding: TenantConfig['branding'] =
+    raw.branding == null
+      ? {}
+      : typeof raw.branding === 'string'
+      ? (JSON.parse(raw.branding) as TenantConfig['branding'])
+      : (raw.branding as TenantConfig['branding']);
+
+  const enabledModules: string[] = raw.enabled_modules
+    ? (JSON.parse(raw.enabled_modules) as string[])
+    : [];
+
   return {
     id: raw.id,
     name: raw.name,
     email: raw.email,
-    domain: raw.domain || `${raw.id}.webwaka.app`,
+    domain: raw.domain ?? `${raw.id}.webwaka.app`,
     status: normaliseStatus(raw.status || 'active'),
     plan: normalisePlan(raw.plan),
     industry: raw.industry,
-    enabledModules: raw.enabled_modules ? JSON.parse(raw.enabled_modules) : [],
-    branding: raw.branding ? (typeof raw.branding === 'string' ? JSON.parse(raw.branding) : raw.branding) : {},
+    enabledModules,
+    branding,
     settings: {
-      timezone: raw.timezone || 'Africa/Lagos',
-      currency: raw.currency || 'NGN',
-      language: raw.language || 'en',
+      timezone: raw.timezone ?? 'Africa/Lagos',
+      currency: raw.currency ?? 'NGN',
+      language: raw.language ?? 'en',
     },
-    createdAt: raw.created_at || raw.createdAt || new Date().toISOString(),
-    updatedAt: raw.updated_at || raw.updatedAt || new Date().toISOString(),
-    owner: raw.owner || {
-      id: raw.owner_id || '',
-      email: raw.email || '',
-      name: raw.owner_name || raw.name || '',
+    createdAt: raw.created_at ?? new Date().toISOString(),
+    updatedAt: raw.updated_at ?? new Date().toISOString(),
+    owner: {
+      id: raw.owner_id ?? '',
+      email: raw.email,
+      name: raw.owner_name ?? raw.name,
     },
   };
 }
@@ -99,7 +137,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get<{ tenants: any[]; pagination: any }>('/tenants?limit=100');
+      const res = await apiClient.get<TenantsApiResponse>('/tenants?limit=100');
       if (res.success && res.data) {
         const mapped = (res.data.tenants || []).map(mapApiTenant);
         setTenants(mapped);

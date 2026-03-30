@@ -1,24 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertCircle, TrendingUp, DollarSign } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import { formatKoboAsNGN, calculateCommission } from '@/lib/commissionCalculator'
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts'
 
 interface LedgerEntry {
   id: string
@@ -30,6 +15,13 @@ interface LedgerEntry {
   type: 'transaction' | 'refund' | 'adjustment'
   createdAt: string
   description: string
+}
+
+interface LedgerPageResponse {
+  entries: LedgerEntry[]
+  total: number
+  limit: number
+  offset: number
 }
 
 interface CommissionSummary {
@@ -59,11 +51,12 @@ export default function Billing() {
           throw new Error('Failed to fetch billing ledger')
         }
 
-        // Backend returns { entries, total, limit, offset } — extract the array
-        const rawData = ledgerResponse.data as any
-        const ledgerData: LedgerEntry[] = Array.isArray(rawData)
-          ? rawData
-          : (rawData?.entries ?? [])
+        // Backend returns { entries, total, limit, offset } — extract the array.
+        // The apiClient generic is kept as the wider union to allow both shapes
+        // (legacy array and new paginated object) without an unsafe cast.
+        const ledgerData: LedgerEntry[] = Array.isArray(ledgerResponse.data)
+          ? (ledgerResponse.data as LedgerEntry[])
+          : ((ledgerResponse.data as LedgerPageResponse)?.entries ?? [])
         setLedger(ledgerData)
 
         // Calculate commission summary
@@ -126,10 +119,6 @@ export default function Billing() {
       </div>
     )
   }
-
-  // Mock ledger data for reference
-  const mockLedgerData: LedgerEntry[] = [
-  ]
 
   return (
     <div className="space-y-6">
