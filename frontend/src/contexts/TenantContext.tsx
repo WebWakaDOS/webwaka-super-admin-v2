@@ -86,6 +86,18 @@ function normalisePlan(raw: string | undefined): TenantConfig['plan'] {
   return 'starter';
 }
 
+// Map frontend TenantConfig fields → API snake_case/uppercase for PUT /tenants/:id
+// Only sends fields the backend TenantUpdateSchema accepts.
+function toApiUpdatePayload(updates: Partial<TenantConfig>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.email !== undefined) payload.email = updates.email;
+  if (updates.industry !== undefined) payload.industry = updates.industry;
+  if (updates.domain !== undefined) payload.domain = updates.domain;
+  if (updates.status !== undefined) payload.status = updates.status.toUpperCase();
+  return payload;
+}
+
 function mapApiTenant(raw: ApiTenantRow): TenantConfig {
   const branding: TenantConfig['branding'] =
     raw.branding == null
@@ -180,19 +192,21 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   };
 
   const updateTenant = async (tenantId: string, updates: Partial<TenantConfig>) => {
-    const res = await apiClient.put(`/tenants/${tenantId}`, updates);
+    const payload = toApiUpdatePayload(updates);
+    const res = await apiClient.put<ApiTenantRow>(`/tenants/${tenantId}`, payload);
     if (!res.success) {
       throw new Error(res.error || 'Failed to update tenant');
     }
+    // Merge server-returned row over existing state; fall back to optimistic
+    // merge if the API returns no data body (e.g. bare 200 OK).
+    const serverData: Partial<TenantConfig> = res.data
+      ? mapApiTenant(res.data)
+      : { ...updates, updatedAt: new Date().toISOString() };
     setTenants((prev) =>
-      prev.map((t) =>
-        t.id === tenantId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
-      )
+      prev.map((t) => (t.id === tenantId ? { ...t, ...serverData } : t))
     );
     if (currentTenant?.id === tenantId) {
-      setCurrentTenant((prev) =>
-        prev ? { ...prev, ...updates, updatedAt: new Date().toISOString() } : null
-      );
+      setCurrentTenant((prev) => (prev ? { ...prev, ...serverData } : null));
     }
   };
 
