@@ -88,7 +88,7 @@
     "onboarding": "Onboarding...",
     "tiers": {
       "STARTER": "Starter",
-      "GROWTH": "Growth",
+      "PROFESSIONAL": "Professional",
       "ENTERPRISE": "Enterprise"
     },
     "statuses": {

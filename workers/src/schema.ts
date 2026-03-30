@@ -8,7 +8,7 @@
 // PARTNERS
 // ============================================================================
 export type PartnerStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CHURNED'
-export type PartnerTier = 'STARTER' | 'GROWTH' | 'ENTERPRISE'
+export type PartnerTier = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'
 export type SuiteName = 'civic' | 'commerce' | 'transport' | 'fintech' | 'realestate' | 'education' | 'super-admin'
 
 export interface Partner {

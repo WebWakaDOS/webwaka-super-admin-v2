@@ -29,10 +29,11 @@ describe('Schema Validation', () => {
     expect(validStatuses).toContain('CHURNED')
   })
 
-  it('should define PartnerTier as STARTER | GROWTH | ENTERPRISE', () => {
-    const validTiers = ['STARTER', 'GROWTH', 'ENTERPRISE']
+  it('should define PartnerTier as STARTER | PROFESSIONAL | ENTERPRISE', () => {
+    const validTiers = ['STARTER', 'PROFESSIONAL', 'ENTERPRISE']
     expect(validTiers).toHaveLength(3)
     expect(validTiers).toContain('ENTERPRISE')
+    expect(validTiers).toContain('PROFESSIONAL')
   })
 
   it('should define SuiteName including all 7 suites', () => {
@@ -370,7 +371,7 @@ describe('Partner Endpoints', () => {
   })
 
   it('GET /partners should support tier filter', async () => {
-    const res = await fetch(`${API_BASE_URL}/partners?tier=GROWTH`)
+    const res = await fetch(`${API_BASE_URL}/partners?tier=PROFESSIONAL`)
     expect([200, 403, 404]).toContain(res.status)
   })
 
