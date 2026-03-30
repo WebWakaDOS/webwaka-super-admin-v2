@@ -12,6 +12,8 @@ import { OfflineBanner } from "./components/OfflineBanner";
 
 // Pages
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 import Dashboard from "./pages/Dashboard";
@@ -46,6 +48,8 @@ function AppRouter() {
     <Switch>
       {/* Public Routes */}
       <Route path={"/login"} component={Login} />
+      <Route path={"/forgot-password"} component={ForgotPassword} />
+      <Route path={"/reset-password"} component={ResetPassword} />
       <Route path={"/unauthorized"} component={Unauthorized} />
 
       {/* Protected Routes */}

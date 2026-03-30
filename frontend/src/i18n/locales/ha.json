@@ -12,6 +12,7 @@
     "deployments": "Turawa",
     "health": "Lafiyar Tsarin",
     "settings": "Saiti",
+    "auditLog": "Littafin Bincike",
     "logout": "Fita"
   },
   "common": {
@@ -112,14 +113,46 @@
     "plan": "Shiri",
     "noTenants": "Babu masu haya."
   },
+  "analytics": {
+    "title": "Nazari",
+    "subtitle": "Kididdigan aikin dandali da nazarin amfani",
+    "activeTenants": "Masu Haya Masu Aiki",
+    "totalTransactions": "Jimlar Kasuwanci (30d)",
+    "revenue30d": "Kuɗin Shiga (30d)",
+    "avgResponseTime": "Matsakaicin Lokacin Amsa",
+    "txnVolume": "Yawan Kasuwanci",
+    "txnVolumeDesc": "Ƙididdigan kasuwanci na yau da kullun a kwanaki 30 da suka wuce",
+    "revenueTrend": "Yanayin Kuɗin Shiga",
+    "revenueTrendDesc": "Jimlar kuɗin shiga (₦) a kwanaki 30 da suka wuce",
+    "suiteUsage": "Rarrabuwar Amfani da Sashi",
+    "suiteUsageDesc": "Rabın kasuwanci ta sashi (kwanaki 30 da suka wuce)",
+    "noSuiteData": "Babu bayanin sashi har yanzu",
+    "transactions": "Kasuwanci",
+    "revenueNGN": "Kuɗin Shiga (₦)"
+  },
   "billing": {
     "title": "Kuɗi",
     "subtitle": "Kula da kuɗin shiga, littafin kuɗi, da hukumomi",
+    "ledger": "Kuɗi & Littafin Kuɗi",
+    "ledgerSubtitle": "Kula da kuɗin dandali da bin hukumomi.",
+    "errorLoading": "Kuskure Wajen Lodi Bayanan Kuɗi",
     "totalRevenue": "Jimlar Kuɗin Shiga",
     "activeSubscriptions": "Biyan Kuɗi Masu Aiki",
     "pendingPayouts": "Biyan Kuɗi Ana Jira",
     "commissionEarned": "Hukumar da Aka Samu",
+    "level1Commission": "Hukumar Matakin 1",
+    "level25Commission": "Hukumar Matakin 2-5",
+    "affiliateCommissions": "Hukumomin abokan hulɗa",
+    "totalCommissions": "Jimlar Hukumomi",
+    "allLevelsCombined": "Duk matakan tare",
+    "commissionHierarchy": "Tsarin Hukuma",
     "transactionLedger": "Littafin Kuɗin Kasuwanci",
+    "allTransactions": "Duk kasuwanci da daidaitawa na dandali",
+    "date": "Kwanan Wata",
+    "tenant": "Mai Haya",
+    "type": "Nau'i",
+    "amount": "Adadi",
+    "noTransactions": "Babu kasuwanci da aka samu.",
     "commissions": "Hukumomi"
   },
   "operations": {
@@ -176,9 +209,13 @@
     "login": "Shiga",
     "logout": "Fita",
     "email": "Imel",
+    "emailAddress": "Adireshin Imel",
     "password": "Kalmar Sirri",
     "signIn": "Shiga",
     "signingIn": "Ana shiga...",
+    "welcomeBack": "Barka da Dawowar",
+    "signInSubtitle": "Shiga asusun babban mai kula naka",
+    "platformSubtitle": "Dandali na Babban Mai Kula",
     "unauthorized": "Ba a Ba da Izini",
     "unauthorizedMessage": "Ba ku da izinin shiga wannan albarkatu."
   }

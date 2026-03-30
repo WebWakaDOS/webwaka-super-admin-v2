@@ -7,6 +7,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from "recharts";
 import { apiClient } from '@/lib/api';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface SuiteMetric {
   suite: string;
@@ -66,6 +67,7 @@ function groupByMonth(metrics: DailyMetric[]) {
 }
 
 const Analytics = () => {
+  const { t } = useTranslation();
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,8 +121,8 @@ const Analytics = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground mt-2">Platform performance metrics and usage analytics</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('analytics.title')}</h1>
+          <p className="text-muted-foreground mt-2">{t('analytics.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2 text-red-600">
           <AlertCircle className="h-5 w-5" />
@@ -133,14 +135,14 @@ const Analytics = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-muted-foreground mt-2">Platform performance metrics and usage analytics</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('analytics.title')}</h1>
+        <p className="text-muted-foreground mt-2">{t('analytics.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Tenants</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('analytics.activeTenants')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-8 w-20" /> : (
@@ -151,7 +153,7 @@ const Analytics = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Transactions (30d)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('analytics.totalTransactions')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-8 w-24" /> : (
@@ -162,7 +164,7 @@ const Analytics = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Revenue (30d)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('analytics.revenue30d')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-8 w-28" /> : (
@@ -173,7 +175,7 @@ const Analytics = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Response Time</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('analytics.avgResponseTime')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-8 w-16" /> : (
@@ -189,8 +191,8 @@ const Analytics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Transaction Volume</CardTitle>
-            <CardDescription>Daily transaction count over the last 30 days</CardDescription>
+            <CardTitle>{t('analytics.txnVolume')}</CardTitle>
+            <CardDescription>{t('analytics.txnVolumeDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-72 w-full" /> : (
@@ -201,7 +203,7 @@ const Analytics = () => {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="transactions" fill="#3b82f6" name="Transactions" />
+                  <Bar dataKey="transactions" fill="#3b82f6" name={t('analytics.transactions')} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -210,8 +212,8 @@ const Analytics = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Revenue Trend</CardTitle>
-            <CardDescription>Gross revenue (₦) over the last 30 days</CardDescription>
+            <CardTitle>{t('analytics.revenueTrend')}</CardTitle>
+            <CardDescription>{t('analytics.revenueTrendDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-72 w-full" /> : (
@@ -227,7 +229,7 @@ const Analytics = () => {
                     dataKey="revenueNaira"
                     stroke="#10b981"
                     strokeWidth={2}
-                    name="Revenue (₦)"
+                    name={t('analytics.revenueNGN')}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -238,12 +240,12 @@ const Analytics = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Suite Usage Distribution</CardTitle>
-          <CardDescription>Transaction share by suite (last 30 days)</CardDescription>
+          <CardTitle>{t('analytics.suiteUsage')}</CardTitle>
+          <CardDescription>{t('analytics.suiteUsageDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? <Skeleton className="h-72 w-full" /> : moduleUsagePct.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">No suite data available yet</p>
+            <p className="text-sm text-muted-foreground py-8 text-center">{t('analytics.noSuiteData')}</p>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <ResponsiveContainer width="100%" height={300}>

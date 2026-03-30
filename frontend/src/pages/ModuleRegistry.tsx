@@ -89,6 +89,11 @@ export default function ModuleRegistry() {
         )
       )
 
+      apiClient.logAuditEvent(
+        newStatus === 'active' ? 'ENABLE_MODULE' : 'DISABLE_MODULE',
+        'module',
+        module.id
+      )
       toast.success(`Module ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update module'

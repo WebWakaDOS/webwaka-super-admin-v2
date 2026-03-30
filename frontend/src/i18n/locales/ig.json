@@ -12,6 +12,7 @@
     "deployments": "Ntinye",
     "health": "Ahụike Sistemu",
     "settings": "Ntọala",
+    "auditLog": "Akwụkwọ Ndekọ Nyocha",
     "logout": "Pụọ"
   },
   "common": {
@@ -112,14 +113,46 @@
     "plan": "Atụmatụ",
     "noTenants": "Enweghị ndị ọbịa."
   },
+  "analytics": {
+    "title": "Nyocha",
+    "subtitle": "Ihe ndezi arụmọrụ ikpo okwu na nyocha ojiji",
+    "activeTenants": "Ndị Ọbịa Na-arụ Ọrụ",
+    "totalTransactions": "Azụmahịa Niile (30d)",
+    "revenue30d": "Ego (30d)",
+    "avgResponseTime": "Oge Nzaghachi Nkezi",
+    "txnVolume": "Ọnụọgụ Azụmahịa",
+    "txnVolumeDesc": "Ọnụọgụ azụmahịa kwa ụbọchị n'ụbọchị 30 gara aga",
+    "revenueTrend": "Ụzọ Ego",
+    "revenueTrendDesc": "Ego niile (₦) n'ụbọchị 30 gara aga",
+    "suiteUsage": "Nkesa Ojiji Akụkụ",
+    "suiteUsageDesc": "Òkè azụmahịa site n'akụkụ (ụbọchị 30 gara aga)",
+    "noSuiteData": "Enweghị data akụkụ dị ugbu a",
+    "transactions": "Azụmahịa",
+    "revenueNGN": "Ego (₦)"
+  },
   "billing": {
     "title": "Ụgwọ",
     "subtitle": "Njikwa ego, akwụkwọ ndekọ, na ụgwọ ọrụ",
+    "ledger": "Ụgwọ & Akwụkwọ Ndekọ",
+    "ledgerSubtitle": "Jikwaa ụgwọ ikpo okwu na śle ụgwọ ọrụ.",
+    "errorLoading": "Mperi Ibugharị Data Ụgwọ",
     "totalRevenue": "Ọnụ Ego Niile",
     "activeSubscriptions": "Ndebanye Aha Na-arụ Ọrụ",
     "pendingPayouts": "Ịkwụ Ụgwọ Na-atọ Ụzọ",
     "commissionEarned": "Ụgwọ Ọrụ Enwetara",
+    "level1Commission": "Ụgwọ Ọrụ Ọkwa 1",
+    "level25Commission": "Ụgwọ Ọrụ Ọkwa 2-5",
+    "affiliateCommissions": "Ụgwọ ọrụ ndị mmekọ",
+    "totalCommissions": "Ụgwọ Ọrụ Niile",
+    "allLevelsCombined": "Ọkwa niile jikọtara",
+    "commissionHierarchy": "Usoro Ụgwọ Ọrụ",
     "transactionLedger": "Akwụkwọ Ndekọ Azụmahịa",
+    "allTransactions": "Azụmahịa niile na mgbatị ikpo okwu",
+    "date": "Ụbọchị",
+    "tenant": "Onye Ọbịa",
+    "type": "Ụdị",
+    "amount": "Ego",
+    "noTransactions": "Enweghị azụmahịa.",
     "commissions": "Ụgwọ Ọrụ"
   },
   "operations": {
@@ -176,9 +209,13 @@
     "login": "Banyere",
     "logout": "Pụọ",
     "email": "Imeelu",
+    "emailAddress": "Adreesị Imeelu",
     "password": "Okwuntughe",
     "signIn": "Banyere",
     "signingIn": "Na-abanyere...",
+    "welcomeBack": "Nnọọ Ọzọ",
+    "signInSubtitle": "Banyere n'akaụntụ onye nlekọta isi gị",
+    "platformSubtitle": "Ikpo Okwu Onye Nlekọta Isi",
     "unauthorized": "Enweghị Ikike",
     "unauthorizedMessage": "Enweghị gị ikike ịnweta ihe a."
   }

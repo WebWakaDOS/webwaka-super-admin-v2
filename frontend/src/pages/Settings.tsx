@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { SettingsIcon, Lock, Bell, Eye, Key, Trash2, Copy, Check } from 'lucide-react';
+import { SettingsIcon, Lock, Bell, Eye, Key, Trash2, Copy, Check, Shield } from 'lucide-react';
 import { apiClient } from '@/lib/api';
+import { TwoFactorSetup } from '@/components/TwoFactorSetup';
 
 interface ApiKey {
   id: string;
@@ -129,6 +130,7 @@ export default function Settings() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   useEffect(() => {
     const fetchApiKeys = async () => {
@@ -176,6 +178,7 @@ export default function Settings() {
   };
 
   const handleSaveSettings = () => {
+    apiClient.logAuditEvent('UPDATE_SETTINGS', 'settings');
     toast.success('System settings saved successfully');
   };
 
@@ -184,6 +187,7 @@ export default function Settings() {
       const response = await apiClient.delete(`/settings/api-keys/${id}`);
       if (response.success) {
         setApiKeys(apiKeys.filter(key => key.id !== id));
+        apiClient.logAuditEvent('DELETE_API_KEY', 'api_key', id);
         toast.success('API key deleted');
       } else {
         throw new Error('Failed to delete API key');
@@ -201,6 +205,7 @@ export default function Settings() {
       });
       if (response.success) {
         setApiKeys([...apiKeys, response.data]);
+        apiClient.logAuditEvent('CREATE_API_KEY', 'api_key', response.data?.id);
         toast.success('New API key generated');
       } else {
         throw new Error('Failed to generate API key');
@@ -221,10 +226,11 @@ export default function Settings() {
 
       {/* Tabs */}
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="api">API Keys</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
         </TabsList>
 
@@ -368,6 +374,20 @@ export default function Settings() {
               </div>
             </div>
           </Card>
+        </TabsContent>
+
+        {/* Security Tab */}
+        <TabsContent value="security">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="w-5 h-5" />
+              <h3 className="text-lg font-semibold">Security Settings</h3>
+            </div>
+            <TwoFactorSetup
+              enabled={twoFactorEnabled}
+              onStatusChange={setTwoFactorEnabled}
+            />
+          </div>
         </TabsContent>
 
         {/* Audit Log Tab */}

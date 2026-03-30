@@ -126,6 +126,7 @@ function OnboardingForm({ onSuccess }: OnboardingFormProps) {
     try {
       const res = await apiClient.post('/partners', form)
       if (!res.success) throw new Error(res.error || 'Failed to onboard partner')
+      apiClient.logAuditEvent('CREATE_PARTNER', 'partner', (res.data as any)?.id)
       onSuccess()
     } catch (err: any) {
       setError(err.message || 'Failed to onboard partner')

@@ -4,6 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import { formatKoboAsNGN, calculateCommission } from '@/lib/commissionCalculator'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface LedgerEntry {
   id: string
@@ -34,6 +35,7 @@ interface CommissionSummary {
 }
 
 export default function Billing() {
+  const { t } = useTranslation()
   const [ledger, setLedger] = useState<LedgerEntry[]>([])
   const [commissionSummary, setCommissionSummary] = useState<CommissionSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -101,8 +103,8 @@ export default function Billing() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing & Ledger</h1>
-          <p className="text-muted-foreground mt-2">Manage platform billing and commission tracking.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('billing.ledger')}</h1>
+          <p className="text-muted-foreground mt-2">{t('billing.ledgerSubtitle')}</p>
         </div>
 
         <Card className="border-red-200 bg-red-50">
@@ -110,7 +112,7 @@ export default function Billing() {
             <div className="flex items-center gap-4">
               <AlertCircle className="h-6 w-6 text-red-600" />
               <div>
-                <p className="font-semibold text-red-900">Error Loading Billing Data</p>
+                <p className="font-semibold text-red-900">{t('billing.errorLoading')}</p>
                 <p className="text-sm text-red-800">{error}</p>
               </div>
             </div>
@@ -124,8 +126,8 @@ export default function Billing() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Billing & Ledger</h1>
-        <p className="text-muted-foreground mt-2">Manage platform billing and commission tracking.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('billing.ledger')}</h1>
+        <p className="text-muted-foreground mt-2">{t('billing.ledgerSubtitle')}</p>
       </div>
 
       {/* Commission Summary Cards */}
@@ -140,7 +142,7 @@ export default function Billing() {
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Level 1 Commission</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('billing.level1Commission')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatKoboAsNGN(commissionSummary.level1Total)}</div>
@@ -150,7 +152,7 @@ export default function Billing() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Level 2-5 Commission</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('billing.level25Commission')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
@@ -161,17 +163,17 @@ export default function Billing() {
                       commissionSummary.level5Total
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">Affiliate commissions</p>
+                <p className="text-xs text-muted-foreground">{t('billing.affiliateCommissions')}</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Commissions</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('billing.totalCommissions')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatKoboAsNGN(commissionSummary.totalCommissions)}</div>
-                <p className="text-xs text-muted-foreground">All levels combined</p>
+                <p className="text-xs text-muted-foreground">{t('billing.allLevelsCombined')}</p>
               </CardContent>
             </Card>
           </>
@@ -181,7 +183,7 @@ export default function Billing() {
       {/* Commission Breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>Commission Hierarchy</CardTitle>
+          <CardTitle>{t('billing.commissionHierarchy')}</CardTitle>
           <CardDescription>5-level affiliate commission breakdown</CardDescription>
         </CardHeader>
         <CardContent>
@@ -212,8 +214,8 @@ export default function Billing() {
       {/* Ledger Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Transaction Ledger</CardTitle>
-          <CardDescription>All platform transactions and adjustments</CardDescription>
+          <CardTitle>{t('billing.transactionLedger')}</CardTitle>
+          <CardDescription>{t('billing.allTransactions')}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -228,12 +230,12 @@ export default function Billing() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-semibold">Date</th>
-                    <th className="text-left py-3 px-4 font-semibold">Tenant</th>
-                    <th className="text-left py-3 px-4 font-semibold">Type</th>
-                    <th className="text-right py-3 px-4 font-semibold">Amount</th>
-                    <th className="text-right py-3 px-4 font-semibold">Commission</th>
-                    <th className="text-left py-3 px-4 font-semibold">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold">{t('billing.date')}</th>
+                    <th className="text-left py-3 px-4 font-semibold">{t('billing.tenant')}</th>
+                    <th className="text-left py-3 px-4 font-semibold">{t('billing.type')}</th>
+                    <th className="text-right py-3 px-4 font-semibold">{t('billing.amount')}</th>
+                    <th className="text-right py-3 px-4 font-semibold">{t('billing.commissions')}</th>
+                    <th className="text-left py-3 px-4 font-semibold">{t('common.status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -272,7 +274,7 @@ export default function Billing() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No transactions found.</p>
+              <p className="text-muted-foreground">{t('billing.noTransactions')}</p>
             </div>
           )}
         </CardContent>

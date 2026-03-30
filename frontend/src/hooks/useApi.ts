@@ -169,9 +169,9 @@ export function useApiKeys() {
   })
 }
 
-export function useAuditLog(limit = 50, offset = 0) {
-  return useApi(() => apiClient.getAuditLog(limit, offset), {
-    cacheKey: `auditlog:${limit}:${offset}`,
+export function useAuditLog(page = 1, limit = 50) {
+  return useApi(() => apiClient.getAuditLog(page, limit), {
+    cacheKey: `auditlog:${page}:${limit}`,
     cacheTtl: 15,
   })
 }

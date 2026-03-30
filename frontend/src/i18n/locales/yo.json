@@ -12,6 +12,7 @@
     "deployments": "Ifilọlẹ",
     "health": "Ilera Eto",
     "settings": "Eto",
+    "auditLog": "Iwe-akọọlẹ Atunyẹwo",
     "logout": "Jade"
   },
   "common": {
@@ -112,14 +113,46 @@
     "plan": "Eto",
     "noTenants": "Ko si alagbatọ."
   },
+  "analytics": {
+    "title": "Itupalẹ",
+    "subtitle": "Awọn metiriki iṣẹ pẹpẹ ati itupalẹ lilo",
+    "activeTenants": "Awọn Alagbatọ Ṣiṣẹ",
+    "totalTransactions": "Apapọ Awọn Iṣowo (30d)",
+    "revenue30d": "Owo Wiwọle (30d)",
+    "avgResponseTime": "Akoko Esi Apapọ",
+    "txnVolume": "Iwọn Iṣowo",
+    "txnVolumeDesc": "Nọmba iṣowo lojoojumọ ni ọjọ 30 to kọja",
+    "revenueTrend": "Ipo Owo Wiwọle",
+    "revenueTrendDesc": "Owo wiwọle gbogbo (₦) ni ọjọ 30 to kọja",
+    "suiteUsage": "Pinpin Lilo Ẹya",
+    "suiteUsageDesc": "Ipin iṣowo nipasẹ ẹya (ọjọ 30 to kọja)",
+    "noSuiteData": "Ko si data ẹya ti o wa sibẹ",
+    "transactions": "Awọn Iṣowo",
+    "revenueNGN": "Owo Wiwọle (₦)"
+  },
   "billing": {
     "title": "Inawo",
     "subtitle": "Iṣakoso owo wiwọle, iwe-akọọlẹ, ati igbowọ",
+    "ledger": "Inawo & Iwe-akọọlẹ",
+    "ledgerSubtitle": "Ṣakoso inawo pẹpẹ ati tọpa igbowọ.",
+    "errorLoading": "Aṣiṣe Gbigba Data Inawo",
     "totalRevenue": "Apapọ Owo Wiwọle",
     "activeSubscriptions": "Awọn Iforukọsilẹ Ṣiṣẹ",
     "pendingPayouts": "Awọn Isanwo Nduro",
     "commissionEarned": "Igbowọ Ti Gba",
+    "level1Commission": "Igbowọ Ipele 1",
+    "level25Commission": "Igbowọ Ipele 2-5",
+    "affiliateCommissions": "Awọn igbowọ alabaṣepọ",
+    "totalCommissions": "Apapọ Awọn Igbowọ",
+    "allLevelsCombined": "Gbogbo awọn ipele papọ",
+    "commissionHierarchy": "Ipele Igbowọ",
     "transactionLedger": "Iwe-akọọlẹ Iṣowo",
+    "allTransactions": "Gbogbo awọn iṣowo ati awọn atunṣe pẹpẹ",
+    "date": "Ọjọ",
+    "tenant": "Alagbatọ",
+    "type": "Iru",
+    "amount": "Iye",
+    "noTransactions": "Ko si iṣowo ti a rii.",
     "commissions": "Awọn Igbowọ"
   },
   "operations": {
@@ -176,9 +209,13 @@
     "login": "Wọle",
     "logout": "Jade",
     "email": "Imeeli",
+    "emailAddress": "Adirẹsi Imeeli",
     "password": "Ọrọigbaniwọle",
     "signIn": "Wọle",
     "signingIn": "Ń wọle...",
+    "welcomeBack": "Ẹ Kaabọ Padà",
+    "signInSubtitle": "Wọle si akọọlẹ alakoso giga rẹ",
+    "platformSubtitle": "Pẹpẹ Alakoso Giga",
     "unauthorized": "Ko ni Aṣẹ",
     "unauthorizedMessage": "O ko ni igbanilaaye lati wọle si orisun yii."
   }

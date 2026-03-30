@@ -21,7 +21,8 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ requires_2fa?: boolean; session_token?: string }>;
+  loginWithTotp: (sessionToken: string, code: string) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: UserRole) => boolean;
@@ -109,9 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
         } else {
+          const parsedUser = JSON.parse(storedUser);
           apiClient.setToken(storedToken);
+          apiClient.setUserId(parsedUser.id || null);
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          setUser(parsedUser);
           scheduleTokenRefresh(storedToken);
         }
       } catch (error) {
@@ -133,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       clearRefreshTimer();
       apiClient.setToken(null);
+      apiClient.setUserId(null);
 
       // Clear all local auth state immediately
       setUser(null);
@@ -153,7 +157,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const applyLoginData = (data: { token: string; user: { id?: string; email?: string; name?: string; role?: string; permissions?: string[]; avatar?: string; createdAt?: string } }, email: string) => {
+    const user: User = {
+      id: data.user.id || 'user_001',
+      email: data.user.email || email,
+      name: data.user.name || 'Admin User',
+      role: (data.user.role === 'super-admin' ? 'super_admin' : data.user.role) as UserRole,
+      permissions: data.user.permissions || [],
+      avatar: data.user.avatar,
+      createdAt: data.user.createdAt || new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+    };
+    apiClient.setToken(data.token);
+    apiClient.setUserId(user.id);
+    setUser(user);
+    setToken(data.token);
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('auth_user', JSON.stringify(user));
+    scheduleTokenRefresh(data.token);
+  };
+
+  const login = async (email: string, password: string): Promise<{ requires_2fa?: boolean; session_token?: string }> => {
     setIsLoading(true);
     try {
       const apiBase = getAPIBase();
@@ -168,27 +192,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await response.json();
-      
-      // Use actual user data from API response
-      const user: User = {
-        id: data.user.id || 'user_001',
-        email: data.user.email || email,
-        name: data.user.name || 'Admin User',
-        role: (data.user.role === 'super-admin' ? 'super_admin' : data.user.role) as UserRole,
-        permissions: data.user.permissions || [],
-        avatar: data.user.avatar,
-        createdAt: data.user.createdAt || new Date().toISOString(),
-        lastLogin: new Date().toISOString(),
-      };
 
-      apiClient.setToken(data.token);
-      setUser(user);
-      setToken(data.token);
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(user));
-      scheduleTokenRefresh(data.token);
+      if (data.requires_2fa) {
+        return { requires_2fa: true, session_token: data.session_token };
+      }
+
+      applyLoginData(data, email);
+      return {};
     } catch (error) {
       console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithTotp = async (sessionToken: string, code: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const apiBase = getAPIBase();
+      const response = await fetch(`${apiBase}/auth/2fa/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_token: sessionToken, code }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Invalid 2FA code');
+      }
+
+      const data = await response.json();
+      applyLoginData(data, data.user?.email ?? '');
+    } catch (error) {
+      console.error('2FA error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -201,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     clearRefreshTimer();
     apiClient.setToken(null);
+    apiClient.setUserId(null);
 
     // Clear local state immediately — the user is logged out from this point
     // regardless of whether the backend call succeeds
@@ -251,6 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user && !!token,
         token,
         login,
+        loginWithTotp,
         logout,
         hasPermission,
         hasRole,

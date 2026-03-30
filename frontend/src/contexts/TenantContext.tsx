@@ -70,6 +70,20 @@ export interface TenantContextType {
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
+export const VALID_TRANSITIONS: Record<TenantConfig['status'], TenantConfig['status'][]> = {
+  provisioning: ['active', 'archived'],
+  active: ['suspended', 'archived'],
+  suspended: ['active', 'archived'],
+  archived: [],
+};
+
+export function isValidStatusTransition(
+  from: TenantConfig['status'],
+  to: TenantConfig['status']
+): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
 function normaliseStatus(raw: string): TenantConfig['status'] {
   const s = raw.toLowerCase();
   if (s === 'active') return 'active';
@@ -215,6 +229,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       // If the refresh fails, the caller still gets the new tenant object and
       // the list will be refreshed on next mount.
       await fetchTenants();
+      apiClient.logAuditEvent('CREATE_TENANT', 'tenant', newTenant.id);
       return newTenant;
     } finally {
       setIsLoading(false);
@@ -225,6 +240,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setError(null);
     try {
+      if (updates.status !== undefined) {
+        const existing = tenants.find((t) => t.id === tenantId);
+        if (existing && !isValidStatusTransition(existing.status, updates.status!)) {
+          const msg = `Invalid status transition: ${existing.status} → ${updates.status}`;
+          setError(msg);
+          setIsLoading(false);
+          throw new Error(msg);
+        }
+      }
       const payload = toApiUpdatePayload(updates);
       const res = await apiClient.put<ApiTenantRow>(`/tenants/${tenantId}`, payload);
       if (!res.success) {
@@ -253,6 +277,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
             : null
         );
       }
+      apiClient.logAuditEvent('UPDATE_TENANT', 'tenant', tenantId);
     } finally {
       setIsLoading(false);
     }
@@ -276,6 +301,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         const next = tenants.filter((t) => t.id !== tenantId);
         setCurrentTenant(next[0] || null);
       }
+      apiClient.logAuditEvent('DELETE_TENANT', 'tenant', tenantId);
     } finally {
       setIsLoading(false);
     }

@@ -76,10 +76,12 @@ export class ApiError extends Error {
 export class ApiClient {
   private baseUrl: string
   private token: string | null = null
+  private userId: string | null = null
 
   constructor(baseUrl: string = '') {
     this.baseUrl = baseUrl || getAPIBase()
     this.token = localStorage.getItem('auth_token')
+    this.userId = localStorage.getItem('auth_user_id')
   }
 
   setToken(token: string | null) {
@@ -88,6 +90,15 @@ export class ApiClient {
       localStorage.setItem('auth_token', token)
     } else {
       localStorage.removeItem('auth_token')
+    }
+  }
+
+  setUserId(userId: string | null) {
+    this.userId = userId
+    if (userId) {
+      localStorage.setItem('auth_user_id', userId)
+    } else {
+      localStorage.removeItem('auth_user_id')
     }
   }
 
@@ -344,6 +355,22 @@ export class ApiClient {
     }
 
     return ws
+  }
+
+  // ── Audit Trail ───────────────────────────────────────────────────────────
+  // Fire-and-forget: a failure to write the audit entry must never block the
+  // primary operation. Callers do not await this method.
+
+  logAuditEvent(action: string, resourceType: string, resourceId?: string): void {
+    const userId = this.userId || localStorage.getItem('auth_user_id') || 'unknown'
+    this.post('/settings/audit-log', {
+      user_id: userId,
+      action,
+      resource_type: resourceType,
+      resource_id: resourceId ?? null,
+    }).catch(() => {
+      // Swallow silently — audit log failure must not surface to users
+    })
   }
 }
 

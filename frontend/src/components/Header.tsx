@@ -9,9 +9,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Bell, Search, Settings, LogOut } from 'lucide-react';
+import { Search, Settings, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { NotificationBell } from '@/components/NotificationBell';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -36,10 +37,7 @@ export function Header() {
         <LanguageSwitcher />
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-        </Button>
+        <NotificationBell />
 
         {/* Tenant Switcher */}
         {tenants.length > 1 && (

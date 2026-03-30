@@ -12,6 +12,7 @@
     "deployments": "Deployments",
     "health": "System Health",
     "settings": "Settings",
+    "auditLog": "Audit Log",
     "logout": "Logout"
   },
   "common": {
@@ -112,14 +113,46 @@
     "plan": "Plan",
     "noTenants": "No tenants found."
   },
+  "analytics": {
+    "title": "Analytics",
+    "subtitle": "Platform performance metrics and usage analytics",
+    "activeTenants": "Active Tenants",
+    "totalTransactions": "Total Transactions (30d)",
+    "revenue30d": "Revenue (30d)",
+    "avgResponseTime": "Avg Response Time",
+    "txnVolume": "Transaction Volume",
+    "txnVolumeDesc": "Daily transaction count over the last 30 days",
+    "revenueTrend": "Revenue Trend",
+    "revenueTrendDesc": "Gross revenue (₦) over the last 30 days",
+    "suiteUsage": "Suite Usage Distribution",
+    "suiteUsageDesc": "Transaction share by suite (last 30 days)",
+    "noSuiteData": "No suite data available yet",
+    "transactions": "Transactions",
+    "revenueNGN": "Revenue (₦)"
+  },
   "billing": {
     "title": "Billing",
     "subtitle": "Revenue, ledger, and commission management",
+    "ledger": "Billing & Ledger",
+    "ledgerSubtitle": "Manage platform billing and commission tracking.",
+    "errorLoading": "Error Loading Billing Data",
     "totalRevenue": "Total Revenue",
     "activeSubscriptions": "Active Subscriptions",
     "pendingPayouts": "Pending Payouts",
     "commissionEarned": "Commission Earned",
+    "level1Commission": "Level 1 Commission",
+    "level25Commission": "Level 2-5 Commission",
+    "affiliateCommissions": "Affiliate commissions",
+    "totalCommissions": "Total Commissions",
+    "allLevelsCombined": "All levels combined",
+    "commissionHierarchy": "Commission Hierarchy",
     "transactionLedger": "Transaction Ledger",
+    "allTransactions": "All platform transactions and adjustments",
+    "date": "Date",
+    "tenant": "Tenant",
+    "type": "Type",
+    "amount": "Amount",
+    "noTransactions": "No transactions found.",
     "commissions": "Commissions"
   },
   "operations": {
@@ -176,9 +209,13 @@
     "login": "Login",
     "logout": "Logout",
     "email": "Email",
+    "emailAddress": "Email Address",
     "password": "Password",
     "signIn": "Sign In",
     "signingIn": "Signing in...",
+    "welcomeBack": "Welcome Back",
+    "signInSubtitle": "Sign in to your super admin account",
+    "platformSubtitle": "Super Admin Platform",
     "unauthorized": "Unauthorized",
     "unauthorizedMessage": "You do not have permission to access this resource."
   }
