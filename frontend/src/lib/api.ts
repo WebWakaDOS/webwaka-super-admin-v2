@@ -141,6 +141,7 @@ export class ApiClient {
   async get<T = any>(endpoint: string): Promise<CompatResponse<T>> {
     try {
       const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('GET', endpoint)
+      if (!envelope.success) return { success: false, error: envelope.errors?.[0] || 'Request failed' }
       return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -150,6 +151,7 @@ export class ApiClient {
   async post<T = any>(endpoint: string, body?: unknown): Promise<CompatResponse<T>> {
     try {
       const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('POST', endpoint, body)
+      if (!envelope.success) return { success: false, error: envelope.errors?.[0] || 'Request failed' }
       return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -159,6 +161,7 @@ export class ApiClient {
   async put<T = any>(endpoint: string, body?: unknown): Promise<CompatResponse<T>> {
     try {
       const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('PUT', endpoint, body)
+      if (!envelope.success) return { success: false, error: envelope.errors?.[0] || 'Request failed' }
       return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -168,6 +171,7 @@ export class ApiClient {
   async delete<T = any>(endpoint: string): Promise<CompatResponse<T>> {
     try {
       const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('DELETE', endpoint)
+      if (!envelope.success) return { success: false, error: envelope.errors?.[0] || 'Request failed' }
       return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -177,6 +181,7 @@ export class ApiClient {
   async patch<T = any>(endpoint: string, body?: unknown): Promise<CompatResponse<T>> {
     try {
       const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('PATCH', endpoint, body)
+      if (!envelope.success) return { success: false, error: envelope.errors?.[0] || 'Request failed' }
       return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }

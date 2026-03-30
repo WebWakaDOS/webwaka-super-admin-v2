@@ -268,9 +268,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         setError(msg);
         throw new Error(msg);
       }
-      setTenants((prev) => prev.filter((t) => t.id !== tenantId));
+      // Derive remaining list once so both state updates share the same array.
+      const remaining = tenants.filter((t) => t.id !== tenantId);
+      setTenants(remaining);
       if (currentTenant?.id === tenantId) {
-        setCurrentTenant(tenants.find((t) => t.id !== tenantId) || null);
+        setCurrentTenant(remaining[0] || null);
       }
     } finally {
       setIsLoading(false);
