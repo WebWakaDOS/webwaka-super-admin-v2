@@ -123,13 +123,6 @@ export default function Login() {
                   'Sign In'
                 )}
               </button>
-
-              {/* Demo Credentials */}
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-300">
-                <p className="font-medium mb-1">Demo Credentials:</p>
-                <p>Email: admin@webwaka.com</p>
-                <p>Password: password</p>
-              </div>
             </div>
           </CardContent>
         </Card>
