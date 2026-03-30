@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { SettingsIcon, Lock, Bell, Eye, Key, Trash2, Copy, Check, Shield } from 'lucide-react';
+import { SettingsIcon, Bell, Eye, Key, Trash2, Copy, Check, Shield } from 'lucide-react';
 import { apiClient } from '@/lib/api';
+import { deleteCacheData } from '@/lib/db';
 import { TwoFactorSetup } from '@/components/TwoFactorSetup';
 
 interface ApiKey {
@@ -178,6 +179,7 @@ export default function Settings() {
   };
 
   const handleSaveSettings = () => {
+    deleteCacheData('settings').catch(() => {});
     apiClient.logAuditEvent('UPDATE_SETTINGS', 'settings');
     toast.success('System settings saved successfully');
   };
@@ -187,6 +189,7 @@ export default function Settings() {
       const response = await apiClient.delete(`/settings/api-keys/${id}`);
       if (response.success) {
         setApiKeys(apiKeys.filter(key => key.id !== id));
+        deleteCacheData('settings:apikeys').catch(() => {});
         apiClient.logAuditEvent('DELETE_API_KEY', 'api_key', id);
         toast.success('API key deleted');
       } else {
@@ -205,6 +208,7 @@ export default function Settings() {
       });
       if (response.success) {
         setApiKeys([...apiKeys, response.data]);
+        deleteCacheData('settings:apikeys').catch(() => {});
         apiClient.logAuditEvent('CREATE_API_KEY', 'api_key', response.data?.id);
         toast.success('New API key generated');
       } else {

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, Zap, Package } from 'lucide-react'
 import { apiClient } from '@/lib/api'
+import { deleteCacheData } from '@/lib/db'
 import { toast } from 'sonner'
 
 interface Module {
@@ -89,6 +90,7 @@ export default function ModuleRegistry() {
         )
       )
 
+      deleteCacheData('modules:list').catch(() => {})
       apiClient.logAuditEvent(
         newStatus === 'active' ? 'ENABLE_MODULE' : 'DISABLE_MODULE',
         'module',

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient } from '@/lib/api';
+import { deleteCacheData } from '@/lib/db';
 
 // Shape returned by GET /tenants (workers/src/index.ts)
 interface ApiTenantRow {
@@ -229,6 +230,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       // If the refresh fails, the caller still gets the new tenant object and
       // the list will be refreshed on next mount.
       await fetchTenants();
+      deleteCacheData('tenants:list').catch(() => {});
       apiClient.logAuditEvent('CREATE_TENANT', 'tenant', newTenant.id);
       return newTenant;
     } finally {
@@ -277,6 +279,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
             : null
         );
       }
+      deleteCacheData('tenants:list').catch(() => {});
+      deleteCacheData(`tenants:${tenantId}`).catch(() => {});
       apiClient.logAuditEvent('UPDATE_TENANT', 'tenant', tenantId);
     } finally {
       setIsLoading(false);
@@ -301,6 +305,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         const next = tenants.filter((t) => t.id !== tenantId);
         setCurrentTenant(next[0] || null);
       }
+      deleteCacheData('tenants:list').catch(() => {});
+      deleteCacheData(`tenants:${tenantId}`).catch(() => {});
       apiClient.logAuditEvent('DELETE_TENANT', 'tenant', tenantId);
     } finally {
       setIsLoading(false);

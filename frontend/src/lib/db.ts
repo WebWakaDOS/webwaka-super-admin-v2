@@ -82,6 +82,13 @@ export async function clearAllCache() {
   await db.cachedData.clear();
 }
 
+export async function deleteCacheData(key: string) {
+  const cached = await db.cachedData.where('key').equals(key).first();
+  if (cached?.id !== undefined) {
+    await db.cachedData.delete(cached.id);
+  }
+}
+
 // Pending mutation management
 export async function addPendingMutation(
   url: string,

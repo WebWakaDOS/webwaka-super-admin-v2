@@ -1,13 +1,14 @@
 /**
  * Commission Calculator - Strict Integer Kobo (NO decimals)
  * 5-Level Affiliate Commission Hierarchy
- * 
+ *
+ * Each level earns a flat percentage of the original transaction amount:
  * Level 1: 5% of transaction
- * Level 2: 3% of Level 1 commission
- * Level 3: 2% of Level 2 commission
- * Level 4: 1% of Level 3 commission
- * Level 5: 0.5% of Level 4 commission
- * 
+ * Level 2: 3% of transaction
+ * Level 3: 2% of transaction
+ * Level 4: 1% of transaction
+ * Level 5: 0.5% of transaction
+ *
  * All values are in kobo (integer, NO decimals)
  */
 
