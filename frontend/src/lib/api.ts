@@ -132,11 +132,16 @@ export class ApiClient {
   // ── Compatibility wrappers ────────────────────────────────────────────────
   // Return {success, data, error} so pages migrated from api-client.ts compile
   // without logic changes. 401/403 session-expiry events still fire.
+  //
+  // The Workers backend always wraps successful responses in the envelope:
+  //   { success: true, data: <payload>, errors?: string[] }
+  // These wrappers unwrap that envelope so callers receive the inner payload
+  // directly in res.data, matching all TypeScript type annotations.
 
   async get<T = any>(endpoint: string): Promise<CompatResponse<T>> {
     try {
-      const data = await this.request<T>('GET', endpoint)
-      return { success: true, data }
+      const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('GET', endpoint)
+      return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -144,8 +149,8 @@ export class ApiClient {
 
   async post<T = any>(endpoint: string, body?: unknown): Promise<CompatResponse<T>> {
     try {
-      const data = await this.request<T>('POST', endpoint, body)
-      return { success: true, data }
+      const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('POST', endpoint, body)
+      return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -153,8 +158,8 @@ export class ApiClient {
 
   async put<T = any>(endpoint: string, body?: unknown): Promise<CompatResponse<T>> {
     try {
-      const data = await this.request<T>('PUT', endpoint, body)
-      return { success: true, data }
+      const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('PUT', endpoint, body)
+      return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -162,8 +167,8 @@ export class ApiClient {
 
   async delete<T = any>(endpoint: string): Promise<CompatResponse<T>> {
     try {
-      const data = await this.request<T>('DELETE', endpoint)
-      return { success: true, data }
+      const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('DELETE', endpoint)
+      return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -171,8 +176,8 @@ export class ApiClient {
 
   async patch<T = any>(endpoint: string, body?: unknown): Promise<CompatResponse<T>> {
     try {
-      const data = await this.request<T>('PATCH', endpoint, body)
-      return { success: true, data }
+      const envelope = await this.request<{ success: boolean; data: T; errors?: string[] }>('PATCH', endpoint, body)
+      return { success: true, data: envelope.data }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
