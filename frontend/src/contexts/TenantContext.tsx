@@ -98,6 +98,25 @@ function toApiUpdatePayload(updates: Partial<TenantConfig>): Record<string, unkn
   return payload;
 }
 
+// Merge only the fields that PUT /tenants/:id actually returns
+// (id, name, email, status, industry, domain, updated_at).
+// This avoids clobbering existing fields (plan, branding, createdAt, etc.)
+// that are omitted from the partial SELECT in the PUT handler.
+function mergePartialRow(
+  existing: TenantConfig,
+  row: ApiTenantRow
+): TenantConfig {
+  return {
+    ...existing,
+    name: row.name ?? existing.name,
+    email: row.email ?? existing.email,
+    status: normaliseStatus(row.status ?? existing.status),
+    industry: row.industry ?? existing.industry,
+    domain: row.domain ?? existing.domain,
+    updatedAt: row.updated_at ?? new Date().toISOString(),
+  };
+}
+
 function mapApiTenant(raw: ApiTenantRow): TenantConfig {
   const branding: TenantConfig['branding'] =
     raw.branding == null
@@ -203,16 +222,26 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw new Error(msg);
     }
-    // Merge server-returned row over existing state; fall back to optimistic
-    // merge if the API returns no data body (e.g. bare 200 OK).
-    const serverData: Partial<TenantConfig> = res.data
-      ? mapApiTenant(res.data)
-      : { ...updates, updatedAt: new Date().toISOString() };
+    // Use mergePartialRow so only the fields the PUT response actually returns
+    // (name, email, status, industry, domain, updated_at) are changed; rich
+    // fields like plan/branding/createdAt are preserved from existing state.
     setTenants((prev) =>
-      prev.map((t) => (t.id === tenantId ? { ...t, ...serverData } : t))
+      prev.map((t) =>
+        t.id === tenantId
+          ? res.data
+            ? mergePartialRow(t, res.data)
+            : { ...t, ...updates, updatedAt: new Date().toISOString() }
+          : t
+      )
     );
     if (currentTenant?.id === tenantId) {
-      setCurrentTenant((prev) => (prev ? { ...prev, ...serverData } : null));
+      setCurrentTenant((prev) =>
+        prev
+          ? res.data
+            ? mergePartialRow(prev, res.data)
+            : { ...prev, ...updates, updatedAt: new Date().toISOString() }
+          : null
+      );
     }
   };
 
