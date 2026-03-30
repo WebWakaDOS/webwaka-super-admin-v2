@@ -8,13 +8,21 @@ function getAPIBase() {
   return isLocalhost ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev';
 }
 
-const API_BASE = getAPIBase();
-
 export interface ApiResponse<T> {
   success?: boolean
   data?: T
   error?: string
   message?: string
+}
+
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
 }
 
 export class ApiClient {
@@ -66,7 +74,23 @@ export class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}))
-      throw new Error(error.error || error.message || `HTTP ${response.status}`)
+      const message = error.error || error.message || `HTTP ${response.status}`
+
+      if (response.status === 401 || response.status === 403) {
+        // Clear local auth state immediately
+        this.token = null
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
+
+        // Notify the rest of the app so React state is also cleared
+        window.dispatchEvent(
+          new CustomEvent('auth:session-expired', {
+            detail: { status: response.status },
+          })
+        )
+      }
+
+      throw new ApiError(message, response.status)
     }
 
     return response.json()

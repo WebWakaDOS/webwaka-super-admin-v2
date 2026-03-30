@@ -65,6 +65,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  // Handle automatic session expiry triggered by 401/403 responses in the API client
+  useEffect(() => {
+    const handleSessionExpired = (event: Event) => {
+      const status = (event as CustomEvent<{ status: number }>).detail?.status;
+
+      // Clear all local auth state immediately
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+
+      // Redirect: 403 means valid session but forbidden resource → /unauthorized
+      //           401 means no valid session at all → /login
+      if (status === 403) {
+        window.location.hash = '#/unauthorized';
+      } else {
+        window.location.hash = '#/login';
+      }
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, []);
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -106,24 +130,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    try {
-      if (token) {
+    // Capture current token before clearing state
+    const currentToken = token;
+
+    // Clear local state immediately — the user is logged out from this point
+    // regardless of whether the backend call succeeds
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+
+    // Best-effort backend notification to allow server-side session invalidation
+    if (currentToken) {
+      try {
         const apiBase = getAPIBase();
         await fetch(`${apiBase}/auth/logout`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${currentToken}`,
             'Content-Type': 'application/json',
           },
         });
+      } catch (error) {
+        console.error('Logout notification error:', error);
       }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
     }
   };
 

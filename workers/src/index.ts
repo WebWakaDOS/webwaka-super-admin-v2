@@ -332,14 +332,22 @@ async function getAuthPayload(c: any): Promise<any | null> {
   return verifyJWT(token, secret)
 }
 
-async function requirePermission(c: any, permission: string): Promise<boolean> {
+/**
+ * requirePermission — throws HTTPException on failure, returns void on success.
+ *   401 Unauthorized — no token present, token signature invalid, or token expired.
+ *   403 Forbidden    — valid token but the caller lacks the required permission.
+ *
+ * tenantId and permissions are ALWAYS sourced from the verified JWT payload
+ * — client-provided headers are never consulted for authorization decisions.
+ */
+async function requirePermission(c: any, permission: string): Promise<void> {
   const payload = await getAuthPayload(c)
-  if (!payload) return false
-  return (
+  if (!payload) throw new HTTPException(401, { message: 'Unauthorized' })
+  const allowed =
     payload.permissions?.includes(permission) ||
     payload.permissions?.includes('read:all') ||
     payload.role === 'SUPER_ADMIN'
-  )
+  if (!allowed) throw new HTTPException(403, { message: 'Forbidden' })
 }
 
 async function getTenantId(c: any): Promise<string> {
@@ -620,8 +628,7 @@ app.post('/health/check', async (c) => {
  */
 app.get('/tenants', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const page = Number(c.req.query('page') || 1)
     const limit = Math.min(Number(c.req.query('limit') || 20), 100)
@@ -662,8 +669,7 @@ app.get('/tenants', async (c) => {
  */
 app.post('/tenants', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const { name, email, industry, domain } = parseBody(TenantCreateSchema, await c.req.json())
 
@@ -692,8 +698,7 @@ app.post('/tenants', async (c) => {
  */
 app.get('/tenants/:id', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const id = c.req.param('id')
     const result = await c.env.TENANTS_DB.prepare(
@@ -717,8 +722,7 @@ app.get('/tenants/:id', async (c) => {
  */
 app.put('/tenants/:id', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const id = c.req.param('id')
     const body = parseBody(TenantUpdateSchema, await c.req.json())
@@ -765,8 +769,7 @@ app.put('/tenants/:id', async (c) => {
  */
 app.delete('/tenants/:id', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const id = c.req.param('id')
     await c.env.TENANTS_DB.prepare(
@@ -793,8 +796,7 @@ app.delete('/tenants/:id', async (c) => {
  */
 app.get('/partners', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const page = Number(c.req.query('page') || 1)
     const limit = Math.min(Number(c.req.query('limit') || 20), 100)
@@ -836,8 +838,7 @@ app.get('/partners', async (c) => {
  */
 app.post('/partners', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const { name, email, phone, company, tier, commission_rate_percent, ndpr_consent, monthly_fee_kobo, notes } =
       parseBody(PartnerCreateSchema, await c.req.json())
@@ -879,8 +880,7 @@ app.post('/partners', async (c) => {
  */
 app.get('/partners/:id', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const id = c.req.param('id')
     const partner = await c.env.TENANTS_DB.prepare(
@@ -913,8 +913,7 @@ app.get('/partners/:id', async (c) => {
  */
 app.put('/partners/:id', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const id = c.req.param('id')
     const body = parseBody(PartnerUpdateSchema, await c.req.json())
@@ -959,8 +958,7 @@ app.put('/partners/:id', async (c) => {
  */
 app.delete('/partners/:id', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const id = c.req.param('id')
     await c.env.TENANTS_DB.prepare(
@@ -982,8 +980,7 @@ app.delete('/partners/:id', async (c) => {
  */
 app.post('/partners/:id/suites', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const partnerId = c.req.param('id')
     const { suite, action } = parseBody(PartnerSuiteSchema, await c.req.json())
@@ -1031,8 +1028,7 @@ app.post('/partners/:id/suites', async (c) => {
  */
 app.get('/deployments', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const suite = c.req.query('suite')
     const environment = c.req.query('environment')
@@ -1062,8 +1058,7 @@ app.get('/deployments', async (c) => {
  */
 app.get('/deployments/:id', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const id = c.req.param('id')
     const result = await c.env.TENANTS_DB.prepare(
@@ -1086,8 +1081,7 @@ app.get('/deployments/:id', async (c) => {
  */
 app.put('/deployments/:id/status', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const id = c.req.param('id')
     const { worker_status, pages_status, last_pipeline_status, last_commit_sha } =
@@ -1133,8 +1127,7 @@ app.put('/deployments/:id/status', async (c) => {
  */
 app.post('/deployments/refresh', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     // In production this would call Cloudflare API to get real deployment status
     // For now, we return the current state and mark as refreshed
@@ -1165,8 +1158,7 @@ app.post('/deployments/refresh', async (c) => {
  */
 app.get('/operations/metrics', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const suite = c.req.query('suite')
     const tenantId = c.req.query('tenantId')
@@ -1200,8 +1192,7 @@ app.get('/operations/metrics', async (c) => {
  */
 app.get('/operations/summary', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const cacheKey = 'cache:operations:summary'
     const cached = await c.env.CACHE_KV.get(cacheKey)
@@ -1249,8 +1240,7 @@ app.get('/operations/summary', async (c) => {
  */
 app.post('/operations/metrics', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const {
       tenant_id, suite, metric_date,
@@ -1295,8 +1285,7 @@ app.post('/operations/metrics', async (c) => {
  */
 app.get('/operations/ai-usage', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const result = await c.env.TENANTS_DB.prepare(
       `SELECT ai_vendor,
@@ -1333,8 +1322,7 @@ app.get('/operations/ai-usage', async (c) => {
  */
 app.get('/ai-quotas/:tenantId', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const tenantId = c.req.param('tenantId')
     const result = await c.env.TENANTS_DB.prepare(
@@ -1374,8 +1362,7 @@ app.get('/ai-quotas/:tenantId', async (c) => {
  */
 app.put('/ai-quotas/:tenantId', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const tenantId = c.req.param('tenantId')
     const { monthly_token_limit, daily_token_limit, active_vendor, byok_key_ref } =
@@ -1424,8 +1411,7 @@ app.put('/ai-quotas/:tenantId', async (c) => {
  */
 app.post('/ai-quotas/:tenantId/reset', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const tenantId = c.req.param('tenantId')
     const { resetType } = parseBody(AIQuotaResetSchema, await c.req.json())
@@ -1467,8 +1453,7 @@ app.post('/ai-quotas/:tenantId/reset', async (c) => {
  */
 app.get('/billing/ledger', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:billing')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:billing')
 
     const tenantId = await getTenantId(c)
     const result = await c.env.BILLING_DB.prepare(
@@ -1533,8 +1518,7 @@ app.get('/billing/summary', async (c) => {
  */
 app.post('/billing/entry', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:billing')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:billing')
 
     const { tenant_id, entry_type, account_from, account_to, amount_kobo, description } =
       parseBody(BillingEntrySchema, await c.req.json())
@@ -1565,8 +1549,7 @@ app.post('/billing/entry', async (c) => {
 
 app.get('/modules', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:tenants')
 
     const result = await c.env.MODULES_DB.prepare(
       `SELECT id, name, description, version, status, category FROM modules ORDER BY name ASC`
@@ -1600,8 +1583,7 @@ app.get('/modules/:tenantId', async (c) => {
 
 app.put('/modules/:tenantId/:moduleId', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'manage:modules')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'manage:modules')
 
     const { tenantId, moduleId } = c.req.param()
     const { enabled } = parseBody(ModuleToggleSchema, await c.req.json())
@@ -1630,8 +1612,7 @@ app.put('/modules/:tenantId/:moduleId', async (c) => {
 
 app.get('/settings', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:settings')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:settings')
 
     return c.json(
       apiResponse(true, {
@@ -1659,8 +1640,7 @@ app.get('/settings', async (c) => {
 
 app.put('/settings', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const body = parseBody(SettingsUpdateSchema, await c.req.json())
     await c.env.FEATURE_FLAGS_KV.put('platform:settings', JSON.stringify({ ...body, updatedAt: Date.now() }))
@@ -1727,8 +1707,7 @@ app.get('/tenants/stats', async (c) => {
  */
 app.get('/billing/metrics', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:billing')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:billing')
 
     const tenantId = await getTenantId(c)
     const cacheKey = `cache:billing:metrics:${tenantId}`
@@ -1777,8 +1756,7 @@ app.get('/billing/metrics', async (c) => {
  */
 app.get('/billing/commissions', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:billing')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:billing')
 
     const page = Math.max(1, Number(c.req.query('page') || 1))
     const limit = Math.min(Number(c.req.query('limit') || 20), 100)
@@ -1892,8 +1870,7 @@ app.get('/health/alerts', async (c) => {
  */
 app.post('/health/alerts', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const { alert_type, severity, message: msg } = parseBody(HealthAlertSchema, await c.req.json())
 
@@ -1941,8 +1918,7 @@ app.get('/settings/api-keys', async (c) => {
 app.post('/settings/api-keys', async (c) => {
   try {
     const session = await requireAuth(c)
-    const hasPermission = await requirePermission(c, 'manage:settings')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'manage:settings')
 
     const { name } = parseBody(ApiKeyCreateSchema, await c.req.json())
 
@@ -1992,8 +1968,7 @@ app.post('/settings/api-keys', async (c) => {
 app.delete('/settings/api-keys/:id', async (c) => {
   try {
     const session = await requireAuth(c)
-    const hasPermission = await requirePermission(c, 'manage:settings')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'manage:settings')
 
     const keyId = c.req.param('id')
     const tenantId = session.tenantId || 'super-admin'
@@ -2025,8 +2000,7 @@ app.delete('/settings/api-keys/:id', async (c) => {
  */
 app.get('/settings/audit-log', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'read:settings')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'read:settings')
 
     const page = Math.max(1, Number(c.req.query('page') || 1))
     const limit = Math.min(Number(c.req.query('limit') || 50), 200)
@@ -2067,8 +2041,7 @@ app.get('/settings/audit-log', async (c) => {
  */
 app.post('/settings/audit-log', async (c) => {
   try {
-    const hasPermission = await requirePermission(c, 'write:tenants')
-    if (!hasPermission) throw new HTTPException(403, { message: 'Forbidden' })
+    await requirePermission(c, 'write:tenants')
 
     const { user_id, action, resource_type, resource_id } = parseBody(AuditLogEntrySchema, await c.req.json())
 
