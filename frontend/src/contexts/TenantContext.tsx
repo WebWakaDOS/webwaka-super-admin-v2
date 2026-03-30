@@ -196,66 +196,84 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   };
 
   const createTenant = async (config: Partial<TenantConfig>): Promise<TenantConfig> => {
+    setIsLoading(true);
     setError(null);
-    const res = await apiClient.post<ApiTenantRow>('/tenants', {
-      name: config.name,
-      email: config.email,
-      industry: config.industry,
-      domain: config.domain,
-    });
-    if (!res.success || !res.data) {
-      const msg = res.error || 'Failed to create tenant';
-      setError(msg);
-      throw new Error(msg);
+    try {
+      const res = await apiClient.post<ApiTenantRow>('/tenants', {
+        name: config.name,
+        email: config.email,
+        industry: config.industry,
+        domain: config.domain,
+      });
+      if (!res.success || !res.data) {
+        const msg = res.error || 'Failed to create tenant';
+        setError(msg);
+        throw new Error(msg);
+      }
+      const newTenant = mapApiTenant(res.data);
+      // Refresh the full list so pagination and server-assigned fields are current.
+      // If the refresh fails, the caller still gets the new tenant object and
+      // the list will be refreshed on next mount.
+      await fetchTenants();
+      return newTenant;
+    } finally {
+      setIsLoading(false);
     }
-    // Refresh the full list so pagination and server-assigned fields are current.
-    await fetchTenants();
-    return mapApiTenant(res.data);
   };
 
   const updateTenant = async (tenantId: string, updates: Partial<TenantConfig>) => {
+    setIsLoading(true);
     setError(null);
-    const payload = toApiUpdatePayload(updates);
-    const res = await apiClient.put<ApiTenantRow>(`/tenants/${tenantId}`, payload);
-    if (!res.success) {
-      const msg = res.error || 'Failed to update tenant';
-      setError(msg);
-      throw new Error(msg);
-    }
-    // Use mergePartialRow so only the fields the PUT response actually returns
-    // (name, email, status, industry, domain, updated_at) are changed; rich
-    // fields like plan/branding/createdAt are preserved from existing state.
-    setTenants((prev) =>
-      prev.map((t) =>
-        t.id === tenantId
-          ? res.data
-            ? mergePartialRow(t, res.data)
-            : { ...t, ...updates, updatedAt: new Date().toISOString() }
-          : t
-      )
-    );
-    if (currentTenant?.id === tenantId) {
-      setCurrentTenant((prev) =>
-        prev
-          ? res.data
-            ? mergePartialRow(prev, res.data)
-            : { ...prev, ...updates, updatedAt: new Date().toISOString() }
-          : null
+    try {
+      const payload = toApiUpdatePayload(updates);
+      const res = await apiClient.put<ApiTenantRow>(`/tenants/${tenantId}`, payload);
+      if (!res.success) {
+        const msg = res.error || 'Failed to update tenant';
+        setError(msg);
+        throw new Error(msg);
+      }
+      // Use mergePartialRow so only the fields the PUT response actually returns
+      // (name, email, status, industry, domain, updated_at) are changed; rich
+      // fields like plan/branding/createdAt are preserved from existing state.
+      setTenants((prev) =>
+        prev.map((t) =>
+          t.id === tenantId
+            ? res.data
+              ? mergePartialRow(t, res.data)
+              : { ...t, ...updates, updatedAt: new Date().toISOString() }
+            : t
+        )
       );
+      if (currentTenant?.id === tenantId) {
+        setCurrentTenant((prev) =>
+          prev
+            ? res.data
+              ? mergePartialRow(prev, res.data)
+              : { ...prev, ...updates, updatedAt: new Date().toISOString() }
+            : null
+        );
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const deleteTenant = async (tenantId: string) => {
+    setIsLoading(true);
     setError(null);
-    const res = await apiClient.delete(`/tenants/${tenantId}`);
-    if (!res.success) {
-      const msg = res.error || 'Failed to delete tenant';
-      setError(msg);
-      throw new Error(msg);
-    }
-    setTenants((prev) => prev.filter((t) => t.id !== tenantId));
-    if (currentTenant?.id === tenantId) {
-      setCurrentTenant(tenants.find((t) => t.id !== tenantId) || null);
+    try {
+      const res = await apiClient.delete(`/tenants/${tenantId}`);
+      if (!res.success) {
+        const msg = res.error || 'Failed to delete tenant';
+        setError(msg);
+        throw new Error(msg);
+      }
+      setTenants((prev) => prev.filter((t) => t.id !== tenantId));
+      if (currentTenant?.id === tenantId) {
+        setCurrentTenant(tenants.find((t) => t.id !== tenantId) || null);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
