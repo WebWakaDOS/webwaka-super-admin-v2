@@ -65,11 +65,11 @@ export default function AuditLog() {
     return () => clearTimeout(timer)
   }, [search])
 
-  const fetchAuditLog = useCallback(async (page: number) => {
+  const fetchAuditLog = useCallback(async (page: number, search: string, action: string) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await apiClient.getAuditLog(page, 50)
+      const res = await apiClient.getAuditLog(page, 50, search || undefined, action !== 'ALL' ? action : undefined)
       if (res.success && res.data) {
         const data = res.data as { entries: AuditEntry[]; pagination: PaginationMeta }
         setEntries(data.entries || [])
@@ -84,22 +84,12 @@ export default function AuditLog() {
     }
   }, [])
 
-  useEffect(() => { fetchAuditLog(1) }, [fetchAuditLog])
+  // Re-fetch from page 1 whenever search term or action filter changes
+  useEffect(() => {
+    fetchAuditLog(1, debouncedSearch, actionFilter)
+  }, [fetchAuditLog, debouncedSearch, actionFilter])
 
-  const filtered = entries.filter((e) => {
-    const matchesSearch =
-      !debouncedSearch ||
-      e.action.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      e.resource_type.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      e.user_id.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      (e.ip_address || '').includes(debouncedSearch)
-
-    const matchesAction =
-      actionFilter === 'ALL' ||
-      e.action.toUpperCase().includes(actionFilter)
-
-    return matchesSearch && matchesAction
-  })
+  const filtered = entries
 
   const totalPages = Math.ceil(pagination.total / pagination.limit)
 
@@ -117,7 +107,7 @@ export default function AuditLog() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => fetchAuditLog(pagination.page)}
+          onClick={() => fetchAuditLog(pagination.page, debouncedSearch, actionFilter)}
           disabled={loading}
           aria-label="Refresh audit log"
         >
@@ -232,7 +222,7 @@ export default function AuditLog() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && !debouncedSearch && actionFilter === 'ALL' && (
+          {totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-4 py-3">
               <span className="text-sm text-muted-foreground">
                 Page {pagination.page} of {totalPages}
@@ -241,7 +231,7 @@ export default function AuditLog() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => fetchAuditLog(pagination.page - 1)}
+                  onClick={() => fetchAuditLog(pagination.page - 1, debouncedSearch, actionFilter)}
                   disabled={pagination.page <= 1 || loading}
                   aria-label="Previous page"
                 >
@@ -250,7 +240,7 @@ export default function AuditLog() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => fetchAuditLog(pagination.page + 1)}
+                  onClick={() => fetchAuditLog(pagination.page + 1, debouncedSearch, actionFilter)}
                   disabled={pagination.page >= totalPages || loading}
                   aria-label="Next page"
                 >

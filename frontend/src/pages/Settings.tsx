@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -132,6 +133,20 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorStatusLoading, setTwoFactorStatusLoading] = useState(true);
+
+  // Load real 2FA enabled state from the server on mount
+  useEffect(() => {
+    apiClient.get2faStatus().then((res) => {
+      if (res.success && res.data) {
+        setTwoFactorEnabled(res.data.enabled ?? false);
+      }
+    }).catch(() => {
+      // Non-critical — leave default false
+    }).finally(() => {
+      setTwoFactorStatusLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
     const fetchApiKeys = async () => {
@@ -387,10 +402,14 @@ export default function Settings() {
               <Shield className="w-5 h-5" />
               <h3 className="text-lg font-semibold">Security Settings</h3>
             </div>
-            <TwoFactorSetup
-              enabled={twoFactorEnabled}
-              onStatusChange={setTwoFactorEnabled}
-            />
+            {twoFactorStatusLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : (
+              <TwoFactorSetup
+                enabled={twoFactorEnabled}
+                onStatusChange={setTwoFactorEnabled}
+              />
+            )}
           </div>
         </TabsContent>
 

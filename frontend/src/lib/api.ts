@@ -270,7 +270,7 @@ export class ApiClient {
   }
 
   async getHealthAlerts() {
-    return this.request('GET', '/health/alerts')
+    return this.get<Array<{ id: string | number; severity: string; message: string; time: string }>>('/health/alerts')
   }
 
   async getServiceStatus(): Promise<CompatResponse<ServiceStatus[]>> {
@@ -317,8 +317,19 @@ export class ApiClient {
     return this.request('DELETE', `/settings/api-keys/${id}`)
   }
 
-  async getAuditLog(page = 1, limit = 50) {
-    return this.get(`/audit-log?page=${page}&limit=${limit}`)
+  async getAuditLog(page = 1, limit = 50, search?: string, action?: string) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (search) params.set('search', search)
+    if (action && action !== 'ALL') params.set('action', action)
+    return this.get(`/audit-log?${params.toString()}`)
+  }
+
+  async getMe() {
+    return this.get<{ id: string; email: string; name: string; role: string; permissions: string[]; avatar?: string; createdAt: string; twoFactorEnabled?: boolean }>('/auth/me')
+  }
+
+  async get2faStatus() {
+    return this.get<{ enabled: boolean }>('/auth/2fa/status')
   }
 
   // ── WebSocket ─────────────────────────────────────────────────────────────

@@ -35,6 +35,24 @@ export interface RecentActivity {
   time: string
 }
 
+const FALLBACK_REVENUE: RevenueData[] = [
+  { month: 'Jan', revenue: 0, commission: 0 },
+  { month: 'Feb', revenue: 0, commission: 0 },
+  { month: 'Mar', revenue: 0, commission: 0 },
+  { month: 'Apr', revenue: 0, commission: 0 },
+  { month: 'May', revenue: 0, commission: 0 },
+  { month: 'Jun', revenue: 0, commission: 0 },
+]
+
+const FALLBACK_ACTIVITY: ActivityData[] = [
+  { time: '00:00', transactions: 0, signups: 0 },
+  { time: '04:00', transactions: 0, signups: 0 },
+  { time: '08:00', transactions: 0, signups: 0 },
+  { time: '12:00', transactions: 0, signups: 0 },
+  { time: '16:00', transactions: 0, signups: 0 },
+  { time: '20:00', transactions: 0, signups: 0 },
+]
+
 export function useDashboardData() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [revenueData, setRevenueData] = useState<RevenueData[]>([])
@@ -46,100 +64,81 @@ export function useDashboardData() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
+      setLoading(true)
+      setError(null)
 
-        // Fetch billing summary for metrics and revenue data
-        const billingResponse = await apiClient.get('/billing/summary')
-        if (!billingResponse.success) {
-          throw new Error('Failed to fetch billing summary')
-        }
+      // Fire all 4 requests concurrently. If any individual request fails we
+      // still render whatever data was successfully returned, rather than
+      // blanking the entire dashboard.
+      const [billingResult, tenantsResult, modulesResult, healthResult] = await Promise.allSettled([
+        apiClient.get('/billing/summary'),
+        apiClient.get('/tenants'),
+        apiClient.get('/modules'),
+        apiClient.get('/health/metrics'),
+      ])
 
-        const billingData = billingResponse.data
-        
-        // Fetch tenants for distribution
-        const tenantsResponse = await apiClient.get('/tenants')
-        if (!tenantsResponse.success) {
-          throw new Error('Failed to fetch tenants')
-        }
+      // ── Billing ───────────────────────────────────────────────────────────
+      const billingData =
+        billingResult.status === 'fulfilled' && billingResult.value.success
+          ? billingResult.value.data
+          : null
 
-        const tenants = tenantsResponse.data || []
-        const activeTenants = tenants.filter((t: any) => t.status === 'active').length
-        const suspendedTenants = tenants.filter((t: any) => t.status === 'suspended').length
-        const provisioningTenants = tenants.filter((t: any) => t.status === 'provisioning').length
-
-        // Fetch modules for active modules count
-        const modulesResponse = await apiClient.get('/modules')
-        if (!modulesResponse.success) {
-          throw new Error('Failed to fetch modules')
-        }
-
-        const modules = modulesResponse.data || []
-        const activeModulesCount = modules.filter((m: any) => m.status === 'active').length
-
-        // Fetch health metrics
-        const healthResponse = await apiClient.get('/health/metrics')
-        if (!healthResponse.success) {
-          throw new Error('Failed to fetch health metrics')
-        }
-
-        const healthMetrics = healthResponse.data
-        const platformHealthPercentage = healthMetrics?.uptime || 99.8
-
-        // Set metrics
-        setMetrics({
-          totalRevenue: billingData?.totalRevenue || 0,
-          totalCommissions: billingData?.totalCommissions || 0,
-          activeModules: activeModulesCount,
-          platformHealth: platformHealthPercentage,
-          activeTenantsCount: activeTenants,
-          suspendedTenantsCount: suspendedTenants,
-          provisioningTenantsCount: provisioningTenants,
-        })
-
-        // Set revenue data (6 months aggregation)
-        const revenueDataFormatted: RevenueData[] = billingData?.monthlyData || [
-          { month: 'Jan', revenue: 0, commission: 0 },
-          { month: 'Feb', revenue: 0, commission: 0 },
-          { month: 'Mar', revenue: 0, commission: 0 },
-          { month: 'Apr', revenue: 0, commission: 0 },
-          { month: 'May', revenue: 0, commission: 0 },
-          { month: 'Jun', revenue: 0, commission: 0 },
-        ]
-        setRevenueData(revenueDataFormatted)
-
-        // Set tenant distribution
-        const distribution: TenantDistribution[] = [
-          { name: 'Active', value: activeTenants, color: '#10B981' },
-          { name: 'Suspended', value: suspendedTenants, color: '#EF4444' },
-          { name: 'Provisioning', value: provisioningTenants, color: '#F59E0B' },
-        ]
-        setTenantDistribution(distribution)
-
-        // Set activity data (hourly aggregation)
-        const activityDataFormatted: ActivityData[] = healthMetrics?.hourlyData || [
-          { time: '00:00', transactions: 0, signups: 0 },
-          { time: '04:00', transactions: 0, signups: 0 },
-          { time: '08:00', transactions: 0, signups: 0 },
-          { time: '12:00', transactions: 0, signups: 0 },
-          { time: '16:00', transactions: 0, signups: 0 },
-          { time: '20:00', transactions: 0, signups: 0 },
-        ]
-        setActivityData(activityDataFormatted)
-
-        // Set recent activity (latest 4 events)
-        const recentActivityFormatted: RecentActivity[] = billingData?.recentEvents || [
-          { event: 'No recent activity', tenant: 'System', time: 'N/A' },
-        ]
-        setRecentActivity(recentActivityFormatted)
-
-        setLoading(false)
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch dashboard data'
-        setError(errorMessage)
-        setLoading(false)
+      if (billingResult.status === 'rejected' || (billingResult.status === 'fulfilled' && !billingResult.value.success)) {
+        setError('Some dashboard data could not be loaded.')
       }
+
+      // ── Tenants ───────────────────────────────────────────────────────────
+      const tenants: any[] =
+        tenantsResult.status === 'fulfilled' && tenantsResult.value.success
+          ? (tenantsResult.value.data as any[]) || []
+          : []
+
+      const activeTenants = tenants.filter((t: any) => t.status === 'active').length
+      const suspendedTenants = tenants.filter((t: any) => t.status === 'suspended').length
+      const provisioningTenants = tenants.filter((t: any) => t.status === 'provisioning').length
+
+      // ── Modules ───────────────────────────────────────────────────────────
+      const modules: any[] =
+        modulesResult.status === 'fulfilled' && modulesResult.value.success
+          ? (modulesResult.value.data as any[]) || []
+          : []
+
+      const activeModulesCount = modules.filter((m: any) => m.status === 'active').length
+
+      // ── Health ────────────────────────────────────────────────────────────
+      const healthMetrics =
+        healthResult.status === 'fulfilled' && healthResult.value.success
+          ? healthResult.value.data
+          : null
+
+      const platformHealthPercentage = (healthMetrics as any)?.uptime ?? 99.8
+
+      // ── Commit state ─────────────────────────────────────────────────────
+      setMetrics({
+        totalRevenue: (billingData as any)?.totalRevenue || 0,
+        totalCommissions: (billingData as any)?.totalCommissions || 0,
+        activeModules: activeModulesCount,
+        platformHealth: platformHealthPercentage,
+        activeTenantsCount: activeTenants,
+        suspendedTenantsCount: suspendedTenants,
+        provisioningTenantsCount: provisioningTenants,
+      })
+
+      setRevenueData((billingData as any)?.monthlyData || FALLBACK_REVENUE)
+
+      setTenantDistribution([
+        { name: 'Active', value: activeTenants, color: '#10B981' },
+        { name: 'Suspended', value: suspendedTenants, color: '#EF4444' },
+        { name: 'Provisioning', value: provisioningTenants, color: '#F59E0B' },
+      ])
+
+      setActivityData((healthMetrics as any)?.hourlyData || FALLBACK_ACTIVITY)
+
+      setRecentActivity(
+        (billingData as any)?.recentEvents || [{ event: 'No recent activity', tenant: 'System', time: 'N/A' }]
+      )
+
+      setLoading(false)
     }
 
     fetchDashboardData()

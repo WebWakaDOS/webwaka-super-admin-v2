@@ -2,89 +2,55 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { AlertCircle, CheckCircle, AlertTriangle, Activity, Database, Zap, Clock } from 'lucide-react';
+import { AlertCircle, CheckCircle, AlertTriangle, Activity, RefreshCw } from 'lucide-react';
+import { useHealthData } from '@/hooks/useHealthData';
+import { apiClient } from '@/lib/api';
 
-interface ServiceStatus {
-  name: string;
-  status: 'healthy' | 'degraded' | 'down';
-  uptime: number;
-  responseTime: number;
-  lastChecked: string;
+interface HealthAlert {
+  id: string | number;
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+  time: string;
 }
-
-interface SystemMetric {
-  timestamp: string;
-  cpu: number;
-  memory: number;
-  diskUsage: number;
-  requests: number;
-}
-
-const SERVICES: ServiceStatus[] = [
-  {
-    name: 'API Gateway',
-    status: 'healthy',
-    uptime: 99.98,
-    responseTime: 45,
-    lastChecked: '2 seconds ago',
-  },
-  {
-    name: 'Database Cluster',
-    status: 'healthy',
-    uptime: 99.99,
-    responseTime: 120,
-    lastChecked: '5 seconds ago',
-  },
-  {
-    name: 'Cache Layer (Redis)',
-    status: 'healthy',
-    uptime: 99.95,
-    responseTime: 8,
-    lastChecked: '3 seconds ago',
-  },
-  {
-    name: 'Message Queue',
-    status: 'degraded',
-    uptime: 98.5,
-    responseTime: 250,
-    lastChecked: '1 second ago',
-  },
-  {
-    name: 'File Storage',
-    status: 'healthy',
-    uptime: 99.99,
-    responseTime: 180,
-    lastChecked: '4 seconds ago',
-  },
-  {
-    name: 'Payment Gateway',
-    status: 'healthy',
-    uptime: 99.9,
-    responseTime: 500,
-    lastChecked: '6 seconds ago',
-  },
-];
-
-const METRICS: SystemMetric[] = [
-  { timestamp: '00:00', cpu: 35, memory: 42, diskUsage: 65, requests: 1200 },
-  { timestamp: '04:00', cpu: 28, memory: 38, diskUsage: 64, requests: 950 },
-  { timestamp: '08:00', cpu: 52, memory: 58, diskUsage: 66, requests: 2100 },
-  { timestamp: '12:00', cpu: 68, memory: 72, diskUsage: 68, requests: 3500 },
-  { timestamp: '16:00', cpu: 45, memory: 52, diskUsage: 67, requests: 2800 },
-  { timestamp: '20:00', cpu: 38, memory: 45, diskUsage: 65, requests: 1600 },
-  { timestamp: '23:59', cpu: 32, memory: 40, diskUsage: 64, requests: 1100 },
-];
-
-const ALERTS = [
-  { id: 1, severity: 'warning', message: 'Message Queue response time elevated (250ms)', time: '5 minutes ago' },
-  { id: 2, severity: 'info', message: 'Database backup completed successfully', time: '1 hour ago' },
-  { id: 3, severity: 'warning', message: 'Disk usage approaching 70% threshold', time: '2 hours ago' },
-  { id: 4, severity: 'info', message: 'API Gateway version updated to 2.1.0', time: '3 hours ago' },
-];
 
 export default function SystemHealth() {
   const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<HealthAlert[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { services, metrics, loading, error } = useHealthData(true, 30000);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, []);
+
+  async function fetchAlerts() {
+    setAlertsLoading(true);
+    setAlertsError(null);
+    try {
+      const res = await apiClient.getHealthAlerts();
+      if (res.success && res.data) {
+        setAlerts((res.data as HealthAlert[]) || []);
+      } else {
+        setAlertsError(res.error || 'Failed to load alerts');
+      }
+    } catch (err) {
+      setAlertsError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setAlertsLoading(false);
+    }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await fetchAlerts();
+    setRefreshing(false);
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -125,175 +91,220 @@ export default function SystemHealth() {
     }
   };
 
-  const healthyServices = SERVICES.filter((s) => s.status === 'healthy').length;
-  const degradedServices = SERVICES.filter((s) => s.status === 'degraded').length;
-  const downServices = SERVICES.filter((s) => s.status === 'down').length;
+  const healthyServices = services.filter((s) => s.status === 'healthy').length;
+  const degradedServices = services.filter((s) => s.status === 'degraded').length;
+  const downServices = services.filter((s) => s.status === 'down').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">System Health</h1>
-        <p className="text-gray-400 mt-1">Platform infrastructure and service monitoring</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">System Health</h1>
+          <p className="text-muted-foreground mt-1">Real-time infrastructure monitoring</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing || loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Healthy Services</p>
-              <p className="text-2xl font-bold mt-2 text-green-400">{healthyServices}</p>
-            </div>
-            <CheckCircle size={32} className="text-green-400/30" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Degraded Services</p>
-              <p className="text-2xl font-bold mt-2 text-yellow-400">{degradedServices}</p>
-            </div>
-            <AlertTriangle size={32} className="text-yellow-400/30" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Down Services</p>
-              <p className="text-2xl font-bold mt-2 text-red-400">{downServices}</p>
-            </div>
-            <AlertCircle size={32} className="text-red-400/30" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Avg Uptime</p>
-              <p className="text-2xl font-bold mt-2">99.6%</p>
-            </div>
-            <Activity size={32} className="text-blue-400/30" />
-          </div>
-        </Card>
-      </div>
+      {/* API error banner */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error} — showing last available data.</span>
+        </div>
+      )}
 
-      {/* Tabs */}
-      <Tabs defaultValue="services" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      {/* Summary cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Healthy Services</p>
+                <p className="text-3xl font-bold text-green-400">{healthyServices}</p>
+              </div>
+              <CheckCircle size={32} className="text-green-400" />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Degraded</p>
+                <p className="text-3xl font-bold text-yellow-400">{degradedServices}</p>
+              </div>
+              <AlertTriangle size={32} className="text-yellow-400" />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Down</p>
+                <p className="text-3xl font-bold text-red-400">{downServices}</p>
+              </div>
+              <AlertCircle size={32} className="text-red-400" />
+            </div>
+          </Card>
+        </div>
+      )}
+
+      <Tabs defaultValue="services">
+        <TabsList>
           <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
         </TabsList>
 
         {/* Services Tab */}
-        <TabsContent value="services">
-          <Card className="p-6">
+        <TabsContent value="services" className="space-y-4">
+          {loading ? (
             <div className="space-y-3">
-              {SERVICES.map((service) => (
-                <div
+              {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20" />)}
+            </div>
+          ) : services.length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground">
+              <Activity size={32} className="mx-auto mb-3 opacity-40" />
+              <p>No service data available</p>
+            </Card>
+          ) : (
+            <div className="grid gap-3">
+              {services.map((service) => (
+                <Card
                   key={service.name}
-                  className="flex items-center justify-between p-4 border border-gray-700 rounded-lg hover:bg-gray-800/50 transition cursor-pointer"
-                  onClick={() => setSelectedService(service.name)}
+                  className={`p-4 cursor-pointer border transition-colors ${
+                    selectedService === service.name ? 'border-primary' : 'border-gray-700'
+                  }`}
+                  onClick={() => setSelectedService(
+                    selectedService === service.name ? null : service.name
+                  )}
                 >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div>{getStatusIcon(service.status)}</div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{service.name}</h3>
-                      <p className="text-xs text-gray-500">Last checked: {service.lastChecked}</p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(service.status)}
+                      <div>
+                        <h3 className="font-semibold">{service.name}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Last checked: {service.lastChecked}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-8 text-right">
-                    <div>
-                      <p className="text-xs text-gray-500">Uptime</p>
-                      <p className="font-semibold text-green-400">{service.uptime}%</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Response Time</p>
-                      <p className="font-semibold">{service.responseTime}ms</p>
-                    </div>
-                    <div>
-                      <Badge className={`${getStatusColor(service.status)}`}>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-sm font-medium">{service.uptime.toFixed(2)}%</p>
+                        <p className="text-xs text-muted-foreground">Uptime</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">{service.responseTime}ms</p>
+                        <p className="text-xs text-muted-foreground">Response</p>
+                      </div>
+                      <Badge className={getStatusColor(service.status)}>
                         {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
                       </Badge>
                     </div>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
-          </Card>
+          )}
         </TabsContent>
 
         {/* Metrics Tab */}
-        <TabsContent value="metrics">
-          <div className="space-y-4">
-            {/* CPU & Memory */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">CPU & Memory Usage</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={METRICS}>
-                  <defs>
-                    <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorMemory" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="timestamp" stroke="#9ca3af" />
-                  <YAxis stroke="#9ca3af" />
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-                  <Legend />
-                  <Area type="monotone" dataKey="cpu" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCpu)" name="CPU %" />
-                  <Area type="monotone" dataKey="memory" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorMemory)" name="Memory %" />
-                </AreaChart>
-              </ResponsiveContainer>
+        <TabsContent value="metrics" className="space-y-6">
+          {loading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-72" />
+              <Skeleton className="h-72" />
+            </div>
+          ) : metrics.length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground">
+              <Activity size={32} className="mx-auto mb-3 opacity-40" />
+              <p>No metrics data available</p>
             </Card>
+          ) : (
+            <>
+              {/* CPU & Memory */}
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">CPU & Memory Usage</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={metrics}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="timestamp" stroke="#9ca3af" />
+                    <YAxis stroke="#9ca3af" />
+                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                    <Legend />
+                    <Area type="monotone" dataKey="cpu" stroke="#3b82f6" fill="#3b82f620" strokeWidth={2} name="CPU %" />
+                    <Area type="monotone" dataKey="memory" stroke="#8b5cf6" fill="#8b5cf620" strokeWidth={2} name="Memory %" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Card>
 
-            {/* Disk & Requests */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Disk Usage & Request Volume</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={METRICS}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="timestamp" stroke="#9ca3af" />
-                  <YAxis stroke="#9ca3af" />
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="diskUsage" stroke="#f59e0b" strokeWidth={2} name="Disk Usage %" />
-                  <Line type="monotone" dataKey="requests" stroke="#10b981" strokeWidth={2} name="Requests/min" />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card>
-          </div>
+              {/* Disk & Requests */}
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Disk Usage & Request Volume</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={metrics}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="timestamp" stroke="#9ca3af" />
+                    <YAxis stroke="#9ca3af" />
+                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="diskUsage" stroke="#f59e0b" strokeWidth={2} name="Disk Usage %" />
+                    <Line type="monotone" dataKey="requests" stroke="#10b981" strokeWidth={2} name="Requests/min" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* Alerts Tab */}
         <TabsContent value="alerts">
           <Card className="p-6">
-            <div className="space-y-3">
-              {ALERTS.map((alert) => (
-                <div key={alert.id} className={`p-4 rounded-lg border border-gray-700 ${getSeverityColor(alert.severity)}`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      {alert.severity === 'critical' && <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />}
-                      {alert.severity === 'warning' && <AlertTriangle size={20} className="mt-0.5 flex-shrink-0" />}
-                      {alert.severity === 'info' && <Activity size={20} className="mt-0.5 flex-shrink-0" />}
-                      <div>
-                        <p className="font-semibold">{alert.message}</p>
-                        <p className="text-xs text-gray-500 mt-1">{alert.time}</p>
+            {alertsLoading ? (
+              <div className="space-y-3">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}
+              </div>
+            ) : alertsError ? (
+              <div className="flex items-center gap-2 text-sm text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                <span>{alertsError}</span>
+              </div>
+            ) : alerts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle size={32} className="mx-auto mb-3 text-green-400" />
+                <p>No active alerts</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {alerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={`p-4 rounded-lg border border-gray-700 ${getSeverityColor(alert.severity)}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3 flex-1">
+                        {alert.severity === 'critical' && <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />}
+                        {alert.severity === 'warning' && <AlertTriangle size={20} className="mt-0.5 flex-shrink-0" />}
+                        {alert.severity === 'info' && <Activity size={20} className="mt-0.5 flex-shrink-0" />}
+                        <div>
+                          <p className="font-semibold">{alert.message}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{alert.time}</p>
+                        </div>
                       </div>
+                      <Badge variant="outline" className="ml-2">
+                        {alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)}
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="ml-2">
-                      {alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)}
-                    </Badge>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>

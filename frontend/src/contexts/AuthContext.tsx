@@ -96,36 +96,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, msUntilRefresh);
   };
 
-  // Initialize auth from localStorage
+  // Initialize auth from localStorage, then validate the token server-side.
   useEffect(() => {
-    const storedToken = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('auth_user');
+    let cancelled = false;
 
-    if (storedToken && storedUser) {
-      try {
-        const payload = decodeJwtPayload(storedToken);
-        const nowSec = Math.floor(Date.now() / 1000);
-        if (payload?.exp && payload.exp <= nowSec) {
-          // Token already expired — clear and force login
+    const init = async () => {
+      const storedToken = localStorage.getItem('auth_token');
+      const storedUser = localStorage.getItem('auth_user');
+
+      if (storedToken && storedUser) {
+        try {
+          const payload = decodeJwtPayload(storedToken);
+          const nowSec = Math.floor(Date.now() / 1000);
+          if (payload?.exp && payload.exp <= nowSec) {
+            // Token already expired locally — clear and force login
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+            if (!cancelled) setIsLoading(false);
+            return;
+          }
+
+          // Set token on the client so getMe() can send the Authorization header
+          apiClient.setToken(storedToken);
+
+          // Validate the token server-side to catch revocations, bans, or
+          // password changes that happened since the token was issued.
+          const meRes = await apiClient.getMe();
+          if (cancelled) return;
+
+          if (!meRes.success || !meRes.data) {
+            // Server rejected the token — clear and force re-login
+            apiClient.setToken(null);
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+            setIsLoading(false);
+            return;
+          }
+
+          // Build a fresh user object from the server response so stale
+          // role/permission data in localStorage never persists across sessions.
+          const serverUser = meRes.data;
+          const freshUser: User = {
+            id: serverUser.id,
+            email: serverUser.email,
+            name: serverUser.name,
+            role: (serverUser.role === 'super-admin' ? 'super_admin' : serverUser.role) as UserRole,
+            permissions: serverUser.permissions || [],
+            avatar: serverUser.avatar,
+            createdAt: serverUser.createdAt,
+            lastLogin: new Date().toISOString(),
+          };
+
+          apiClient.setUserId(freshUser.id);
+          setToken(storedToken);
+          setUser(freshUser);
+          localStorage.setItem('auth_user', JSON.stringify(freshUser));
+          scheduleTokenRefresh(storedToken);
+        } catch (error) {
+          console.error('Failed to restore auth state:', error);
+          apiClient.setToken(null);
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
-        } else {
-          const parsedUser = JSON.parse(storedUser);
-          apiClient.setToken(storedToken);
-          apiClient.setUserId(parsedUser.id || null);
-          setToken(storedToken);
-          setUser(parsedUser);
-          scheduleTokenRefresh(storedToken);
         }
-      } catch (error) {
-        console.error('Failed to restore auth state:', error);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
       }
-    }
 
-    setIsLoading(false);
-    return () => clearRefreshTimer();
+      if (!cancelled) setIsLoading(false);
+    };
+
+    init();
+
+    return () => {
+      cancelled = true;
+      clearRefreshTimer();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

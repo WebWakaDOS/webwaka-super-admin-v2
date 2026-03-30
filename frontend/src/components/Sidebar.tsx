@@ -1,5 +1,5 @@
 import { useLocation } from 'wouter';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, UserRole } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
 import {
   LayoutDashboard,
@@ -13,6 +13,7 @@ import {
   Handshake,
   Activity,
   Rocket,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -21,15 +22,15 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  requiredRole?: string;
+  roles?: UserRole[];
 }
 
 export function Sidebar() {
   const [location, navigate] = useLocation();
-  const { logout, user } = useAuth();
+  const { logout, user, hasRole } = useAuth();
   const { currentTenant } = useTenant();
 
-  const navItems: NavItem[] = [
+  const allNavItems: NavItem[] = [
     {
       label: 'Dashboard',
       href: '/',
@@ -39,41 +40,55 @@ export function Sidebar() {
       label: 'Tenants',
       href: '/tenants',
       icon: <Users className="h-5 w-5" />,
+      roles: ['super_admin', 'support'],
     },
     {
       label: 'Partners',
       href: '/partners',
       icon: <Handshake className="h-5 w-5" />,
+      roles: ['super_admin'],
     },
     {
       label: 'Modules',
       href: '/modules',
       icon: <Package className="h-5 w-5" />,
+      roles: ['super_admin'],
     },
     {
       label: 'Billing',
       href: '/billing',
       icon: <DollarSign className="h-5 w-5" />,
+      roles: ['super_admin', 'partner'],
     },
     {
       label: 'Operations',
       href: '/operations',
       icon: <Activity className="h-5 w-5" />,
+      roles: ['super_admin'],
     },
     {
       label: 'Analytics',
       href: '/analytics',
       icon: <BarChart3 className="h-5 w-5" />,
+      roles: ['super_admin', 'partner'],
     },
     {
       label: 'Deployments',
       href: '/deployments',
       icon: <Rocket className="h-5 w-5" />,
+      roles: ['super_admin'],
     },
     {
       label: 'System Health',
       href: '/health',
       icon: <AlertCircle className="h-5 w-5" />,
+      roles: ['super_admin', 'support'],
+    },
+    {
+      label: 'Audit Log',
+      href: '/audit-log',
+      icon: <ClipboardList className="h-5 w-5" />,
+      roles: ['super_admin', 'support'],
     },
     {
       label: 'Settings',
@@ -81,6 +96,12 @@ export function Sidebar() {
       icon: <Settings className="h-5 w-5" />,
     },
   ];
+
+  // Filter nav items: items with no `roles` array are visible to everyone;
+  // items with a `roles` array are only shown to users with a matching role.
+  const navItems = allNavItems.filter(
+    (item) => !item.roles || (user && item.roles.some((r) => hasRole(r)))
+  );
 
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col h-screen">
