@@ -75,23 +75,16 @@ export class ApiError extends Error {
 
 export class ApiClient {
   private baseUrl: string
-  private token: string | null = null
   private userId: string | null = null
 
   constructor(baseUrl: string = '') {
     this.baseUrl = baseUrl || getAPIBase()
-    this.token = localStorage.getItem('auth_token')
     this.userId = localStorage.getItem('auth_user_id')
   }
 
-  setToken(token: string | null) {
-    this.token = token
-    if (token) {
-      localStorage.setItem('auth_token', token)
-    } else {
-      localStorage.removeItem('auth_token')
-    }
-  }
+  // No-op kept for call-site compatibility. JWT is now an HttpOnly cookie
+  // managed entirely by the browser — JavaScript must never read or write it.
+  setToken(_token: string | null) {}
 
   setUserId(userId: string | null) {
     this.userId = userId
@@ -103,22 +96,20 @@ export class ApiClient {
   }
 
   private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
+    return {
       'Content-Type': 'application/json',
     }
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
-    return headers
   }
 
   // Core request — throws ApiError on non-OK responses.
   // 401/403 dispatches auth:session-expired before throwing.
+  // credentials: 'include' ensures the HttpOnly auth cookie is sent on every request.
   private async request<T>(method: string, endpoint: string, body?: unknown): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
     const options: RequestInit = {
       method,
       headers: this.getHeaders(),
+      credentials: 'include',
     }
     if (body !== undefined) {
       options.body = JSON.stringify(body)
@@ -128,9 +119,6 @@ export class ApiClient {
       const error = await response.json().catch(() => ({}))
       const message = error.error || error.message || `HTTP ${response.status}`
       if (response.status === 401 || response.status === 403) {
-        this.token = null
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('auth_user')
         window.dispatchEvent(
           new CustomEvent('auth:session-expired', { detail: { status: response.status } })
         )
@@ -209,10 +197,10 @@ export class ApiClient {
     return this.request('POST', '/auth/logout')
   }
 
-  // Exchange the current valid JWT for a fresh one before it expires.
-  // Returns { success, data: { token } } using the compat wrapper.
-  async refreshToken(): Promise<CompatResponse<{ token: string }>> {
-    return this.post<{ token: string }>('/auth/refresh')
+  // Exchange the current valid JWT (sent as HttpOnly cookie) for a new one.
+  // Returns { success, data: { tokenExpiresAt } } using the compat wrapper.
+  async refreshToken(): Promise<CompatResponse<{ tokenExpiresAt: number }>> {
+    return this.post<{ tokenExpiresAt: number }>('/auth/refresh')
   }
 
   // ── Tenants ───────────────────────────────────────────────────────────────
@@ -325,7 +313,7 @@ export class ApiClient {
   }
 
   async getMe() {
-    return this.get<{ id: string; email: string; name: string; role: string; permissions: string[]; avatar?: string; createdAt: string; twoFactorEnabled?: boolean }>('/auth/me')
+    return this.get<{ id: string; email: string; name: string; role: string; permissions: string[]; avatar?: string; createdAt: string; twoFactorEnabled?: boolean; tokenExpiresAt?: number }>('/auth/me')
   }
 
   async get2faStatus() {
@@ -333,14 +321,15 @@ export class ApiClient {
   }
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
-  // Uses the JWT token (not a hardcoded API key) for authentication.
+  // The browser automatically includes the HttpOnly auth cookie on WebSocket
+  // connections to the same domain — no token parameter needed.
 
   connectWebSocket(
     endpoint: string,
     onMessage: (data: any) => void,
     onError?: (error: Event) => void
   ): WebSocket {
-    const wsUrl = `${this.baseUrl.replace('http', 'ws')}${endpoint}?token=${this.token || ''}`
+    const wsUrl = `${this.baseUrl.replace('http', 'ws')}${endpoint}`
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {
@@ -373,7 +362,7 @@ export class ApiClient {
   // primary operation. Callers do not await this method.
 
   logAuditEvent(action: string, resourceType: string, resourceId?: string): void {
-    const userId = this.userId || localStorage.getItem('auth_user_id') || 'unknown'
+    const userId = this.userId || 'unknown'
     this.post('/settings/audit-log', {
       user_id: userId,
       action,

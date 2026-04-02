@@ -20,6 +20,8 @@ export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  // token is always null — the JWT now lives in an HttpOnly cookie and is
+  // inaccessible to JavaScript. Field is kept for interface backward compatibility.
   token: string | null;
   login: (email: string, password: string) => Promise<{ requires_2fa?: boolean; session_token?: string }>;
   loginWithTotp: (sessionToken: string, code: string) => Promise<void>;
@@ -41,22 +43,9 @@ function getAPIBase() {
   return isLocalhost ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev';
 }
 
-// Decode JWT payload without verifying signature (frontend only).
-function decodeJwtPayload(token: string): { exp?: number } | null {
-  try {
-    const payloadB64 = token.split('.')[1];
-    if (!payloadB64) return null;
-    const json = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -68,26 +57,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Schedule a token refresh so the new token arrives before the old one expires.
-  // Fires (expiry - 60 min) from now, or immediately if < 60 min left.
-  const scheduleTokenRefresh = (currentToken: string) => {
+  // Schedule a token refresh based on the cookie's expiry timestamp (unix seconds).
+  // Fires at (expiry - 60 min), or immediately if < 60 min remain.
+  // The browser sends the HttpOnly cookie automatically on the refresh request.
+  const scheduleTokenRefresh = (tokenExpiresAt: number) => {
     clearRefreshTimer();
-    const payload = decodeJwtPayload(currentToken);
-    if (!payload?.exp) return;
     const nowSec = Math.floor(Date.now() / 1000);
-    const msUntilRefresh = Math.max(0, (payload.exp - nowSec - 3600) * 1000);
+    const msUntilRefresh = Math.max(0, (tokenExpiresAt - nowSec - 3600) * 1000);
     refreshTimerRef.current = setTimeout(async () => {
       try {
         const res = await apiClient.refreshToken();
-        if (res.success && res.data?.token) {
-          const newToken = res.data.token;
-          apiClient.setToken(newToken);
-          setToken(newToken);
-          localStorage.setItem('auth_token', newToken);
-          scheduleTokenRefresh(newToken);
+        if (res.success && res.data?.tokenExpiresAt) {
+          scheduleTokenRefresh(res.data.tokenExpiresAt);
         } else {
-          // Refresh failed (e.g. token already expired) — force re-login
-          apiClient.setToken(null);
+          // Refresh failed — force re-login
           window.dispatchEvent(new CustomEvent('auth:session-expired', { detail: { status: 401 } }));
         }
       } catch (err) {
@@ -96,68 +79,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, msUntilRefresh);
   };
 
-  // Initialize auth from localStorage, then validate the token server-side.
+  // Initialize auth state by validating the HttpOnly cookie server-side.
+  // No localStorage read for the token — the browser sends the cookie automatically.
   useEffect(() => {
     let cancelled = false;
 
     const init = async () => {
-      const storedToken = localStorage.getItem('auth_token');
-      const storedUser = localStorage.getItem('auth_user');
+      try {
+        // Validate the cookie server-side — this is the source of truth.
+        // credentials: 'include' is set on apiClient globally so the cookie is sent.
+        const meRes = await apiClient.getMe();
+        if (cancelled) return;
 
-      if (storedToken && storedUser) {
-        try {
-          const payload = decodeJwtPayload(storedToken);
-          const nowSec = Math.floor(Date.now() / 1000);
-          if (payload?.exp && payload.exp <= nowSec) {
-            // Token already expired locally — clear and force login
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('auth_user');
-            if (!cancelled) setIsLoading(false);
-            return;
-          }
-
-          // Set token on the client so getMe() can send the Authorization header
-          apiClient.setToken(storedToken);
-
-          // Validate the token server-side to catch revocations, bans, or
-          // password changes that happened since the token was issued.
-          const meRes = await apiClient.getMe();
-          if (cancelled) return;
-
-          if (!meRes.success || !meRes.data) {
-            // Server rejected the token — clear and force re-login
-            apiClient.setToken(null);
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('auth_user');
-            setIsLoading(false);
-            return;
-          }
-
-          // Build a fresh user object from the server response so stale
-          // role/permission data in localStorage never persists across sessions.
-          const serverUser = meRes.data;
-          const freshUser: User = {
-            id: serverUser.id,
-            email: serverUser.email,
-            name: serverUser.name,
-            role: (serverUser.role === 'super-admin' ? 'super_admin' : serverUser.role) as UserRole,
-            permissions: serverUser.permissions || [],
-            avatar: serverUser.avatar,
-            createdAt: serverUser.createdAt,
-            lastLogin: new Date().toISOString(),
-          };
-
-          apiClient.setUserId(freshUser.id);
-          setToken(storedToken);
-          setUser(freshUser);
-          localStorage.setItem('auth_user', JSON.stringify(freshUser));
-          scheduleTokenRefresh(storedToken);
-        } catch (error) {
-          console.error('Failed to restore auth state:', error);
-          apiClient.setToken(null);
-          localStorage.removeItem('auth_token');
+        if (!meRes.success || !meRes.data) {
+          // No valid cookie — user must log in
           localStorage.removeItem('auth_user');
+          if (!cancelled) setIsLoading(false);
+          return;
         }
+
+        const serverUser = meRes.data;
+        const freshUser: User = {
+          id: serverUser.id,
+          email: serverUser.email,
+          name: serverUser.name,
+          role: (serverUser.role === 'super-admin' ? 'super_admin' : serverUser.role) as UserRole,
+          permissions: serverUser.permissions || [],
+          avatar: serverUser.avatar,
+          createdAt: serverUser.createdAt || new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+        };
+
+        apiClient.setUserId(freshUser.id);
+        setUser(freshUser);
+        localStorage.setItem('auth_user', JSON.stringify(freshUser));
+
+        if (serverUser.tokenExpiresAt) {
+          scheduleTokenRefresh(serverUser.tokenExpiresAt);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        // Network failure or 401 — clear stale user cache
+        console.error('Failed to restore auth state:', error);
+        localStorage.removeItem('auth_user');
       }
 
       if (!cancelled) setIsLoading(false);
@@ -178,17 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const status = (event as CustomEvent<{ status: number }>).detail?.status;
 
       clearRefreshTimer();
-      apiClient.setToken(null);
       apiClient.setUserId(null);
 
-      // Clear all local auth state immediately
       setUser(null);
-      setToken(null);
-      localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
 
-      // Redirect: 403 means valid session but forbidden resource → /unauthorized
-      //           401 means no valid session at all → /login
+      // Redirect: 403 → /unauthorized, 401 → /login
       if (status === 403) {
         window.location.hash = '#/unauthorized';
       } else {
@@ -200,8 +159,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
   }, []);
 
-  const applyLoginData = (data: { token: string; user: { id?: string; email?: string; name?: string; role?: string; permissions?: string[]; avatar?: string; createdAt?: string } }, email: string) => {
-    const user: User = {
+  // Called after a successful login or 2FA validation.
+  // The JWT is now in the HttpOnly cookie set by the server — we only handle
+  // the user profile and the refresh schedule here.
+  const applyLoginData = (
+    data: {
+      tokenExpiresAt?: number;
+      user: {
+        id?: string;
+        email?: string;
+        name?: string;
+        role?: string;
+        permissions?: string[];
+        avatar?: string;
+        createdAt?: string;
+        tenantId?: string;
+      };
+    },
+    email: string
+  ) => {
+    const freshUser: User = {
       id: data.user.id || 'user_001',
       email: data.user.email || email,
       name: data.user.name || 'Admin User',
@@ -211,22 +188,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createdAt: data.user.createdAt || new Date().toISOString(),
       lastLogin: new Date().toISOString(),
     };
-    apiClient.setToken(data.token);
-    apiClient.setUserId(user.id);
-    setUser(user);
-    setToken(data.token);
-    localStorage.setItem('auth_token', data.token);
-    localStorage.setItem('auth_user', JSON.stringify(user));
-    scheduleTokenRefresh(data.token);
+    apiClient.setUserId(freshUser.id);
+    setUser(freshUser);
+    localStorage.setItem('auth_user', JSON.stringify(freshUser));
+    if (data.tokenExpiresAt) {
+      scheduleTokenRefresh(data.tokenExpiresAt);
+    }
   };
 
   const login = async (email: string, password: string): Promise<{ requires_2fa?: boolean; session_token?: string }> => {
     setIsLoading(true);
     try {
       const apiBase = getAPIBase();
+      // credentials: 'include' causes the browser to store the Set-Cookie from the response
       const response = await fetch(`${apiBase}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -234,7 +212,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Login failed');
       }
 
-      const data = await response.json();
+      // Response envelope: { success: true, data: { tokenExpiresAt, user } }
+      const raw = await response.json();
+      const data = raw.data ?? raw;
 
       if (data.requires_2fa) {
         return { requires_2fa: true, session_token: data.session_token };
@@ -257,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`${apiBase}/auth/2fa/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ session_token: sessionToken, code }),
       });
 
@@ -264,7 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Invalid 2FA code');
       }
 
-      const data = await response.json();
+      const raw = await response.json();
+      const data = raw.data ?? raw;
       applyLoginData(data, data.user?.email ?? '');
     } catch (error) {
       console.error('2FA error:', error);
@@ -275,34 +257,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    // Capture current token before clearing state
-    const currentToken = token;
-
     clearRefreshTimer();
-    apiClient.setToken(null);
     apiClient.setUserId(null);
 
-    // Clear local state immediately — the user is logged out from this point
-    // regardless of whether the backend call succeeds
+    // Clear local state immediately
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
 
-    // Best-effort backend notification to allow server-side session invalidation
-    if (currentToken) {
-      try {
-        const apiBase = getAPIBase();
-        await fetch(`${apiBase}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${currentToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
-      } catch (error) {
-        console.error('Logout notification error:', error);
-      }
+    // Best-effort: ask the server to clear the HttpOnly cookie.
+    // credentials: 'include' causes the browser to send the cookie so the server
+    // can identify the session, and the server responds with Set-Cookie: Max-Age=0.
+    try {
+      const apiBase = getAPIBase();
+      await fetch(`${apiBase}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Logout notification error:', error);
     }
   };
 
@@ -328,8 +301,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isLoading,
-        isAuthenticated: !!user && !!token,
-        token,
+        // Authenticated when a valid user object exists (cookie validated server-side).
+        isAuthenticated: !!user,
+        // Always null — JWT lives in an HttpOnly cookie, not accessible to JS.
+        token: null,
         login,
         loginWithTotp,
         logout,

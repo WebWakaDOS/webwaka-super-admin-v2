@@ -92,6 +92,7 @@ app.use('*', async (c, next) => {
     const headers: Record<string, string> = {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Credentials': 'true',
       'Access-Control-Max-Age': '86400',
     }
     if (isAllowed) headers['Access-Control-Allow-Origin'] = origin || '*'
@@ -100,6 +101,7 @@ app.use('*', async (c, next) => {
   await next()
   if (isAllowed && origin) {
     c.res.headers.set('Access-Control-Allow-Origin', origin)
+    c.res.headers.set('Access-Control-Allow-Credentials', 'true')
     c.res.headers.set('Vary', 'Origin')
   }
 })
@@ -336,13 +338,42 @@ async function signJWT(
   return `${header}.${fullPayload}.${sig}`
 }
 
+// Parse the auth_token value from a raw Cookie header string.
+function parseCookieToken(cookieHeader: string): string | null {
+  for (const part of cookieHeader.split(';')) {
+    const [rawKey, ...rest] = part.split('=')
+    if (rawKey.trim() === 'auth_token') return rest.join('=').trim() || null
+  }
+  return null
+}
+
+// Build a Set-Cookie string for the auth token.
+// Secure flag is omitted on non-production so localhost (http) dev still works.
+function buildAuthCookieStr(token: string, maxAge: number, env: string): string {
+  const secure = env === 'production' || env === 'staging' ? '; Secure' : ''
+  return `auth_token=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`
+}
+
+// Build a Set-Cookie string that immediately expires the auth cookie.
+function buildClearCookieStr(env: string): string {
+  const secure = env === 'production' || env === 'staging' ? '; Secure' : ''
+  return `auth_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}`
+}
+
 async function getAuthPayload(c: any): Promise<any | null> {
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.slice(7)
   const secret = c.env.JWT_SECRET
   if (!secret) return null
-  return verifyJWT(token, secret)
+
+  // Prefer the HttpOnly cookie (browser clients)
+  const cookieHeader = c.req.header('Cookie') || ''
+  const cookieToken = parseCookieToken(cookieHeader)
+  if (cookieToken) return verifyJWT(cookieToken, secret)
+
+  // Fall back to Authorization: Bearer header (API clients / test suite)
+  const authHeader = c.req.header('Authorization')
+  if (authHeader?.startsWith('Bearer ')) return verifyJWT(authHeader.slice(7), secret)
+
+  return null
 }
 
 /**
@@ -478,9 +509,15 @@ app.post('/auth/login', async (c) => {
       .bind(result.id)
       .run()
 
+    // Set the JWT as an HttpOnly cookie — never expose it in the response body
+    const maxAge = 86400 // 24 hours
+    c.header('Set-Cookie', buildAuthCookieStr(token, maxAge, c.env.ENVIRONMENT || 'development'))
+
+    const tokenExpiresAt = Math.floor(Date.now() / 1000) + maxAge
+
     return c.json(
       apiResponse(true, {
-        token,
+        tokenExpiresAt,
         user: {
           id: result.id,
           email: result.email,
@@ -520,7 +557,13 @@ app.post('/auth/refresh', async (c) => {
       86400 // 24 hours
     )
 
-    return c.json(apiResponse(true, { token: newToken }))
+    // Rotate the HttpOnly cookie — replace old token with the new one
+    const maxAge = 86400
+    c.header('Set-Cookie', buildAuthCookieStr(newToken, maxAge, c.env.ENVIRONMENT || 'development'))
+
+    const tokenExpiresAt = Math.floor(Date.now() / 1000) + maxAge
+
+    return c.json(apiResponse(true, { tokenExpiresAt }))
   } catch (err) {
     if (err instanceof HTTPException) throw err
     throw new HTTPException(500, { message: 'Internal server error' })
@@ -529,11 +572,10 @@ app.post('/auth/refresh', async (c) => {
 
 /**
  * POST /auth/logout
- * Stateless JWT — client discards token. Server-side blocklist can be added later via jti.
+ * Clears the HttpOnly auth cookie. Server-side blocklist can be added later via jti.
  */
 app.post('/auth/logout', async (c) => {
-  // With signed JWTs, logout is handled client-side by discarding the token.
-  // Future enhancement: store jti in SESSIONS_KV blocklist for immediate revocation.
+  c.header('Set-Cookie', buildClearCookieStr(c.env.ENVIRONMENT || 'development'))
   return c.json(apiResponse(true, { message: 'Logged out successfully' }))
 })
 
@@ -547,11 +589,14 @@ app.get('/auth/me', async (c) => {
     if (!payload) throw new HTTPException(401, { message: 'Unauthorized' })
     return c.json(
       apiResponse(true, {
-        userId: payload.sub,
+        id: payload.sub,
         email: payload.email,
         tenantId: payload.tenantId,
         role: payload.role,
         permissions: payload.permissions,
+        // exp is already in the JWT payload; expose it so the client can schedule
+        // a proactive token refresh without ever reading the HttpOnly cookie.
+        tokenExpiresAt: payload.exp,
       })
     )
   } catch (err) {
