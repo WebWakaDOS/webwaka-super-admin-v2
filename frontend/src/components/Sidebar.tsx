@@ -14,6 +14,7 @@ import {
   Activity,
   Rocket,
   ClipboardList,
+  Flag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -52,6 +53,12 @@ export function Sidebar() {
       label: 'Modules',
       href: '/modules',
       icon: <Package className="h-5 w-5" />,
+      roles: ['super_admin'],
+    },
+    {
+      label: 'Feature Flags',
+      href: '/feature-flags',
+      icon: <Flag className="h-5 w-5" />,
       roles: ['super_admin'],
     },
     {

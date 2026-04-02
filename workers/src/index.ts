@@ -219,6 +219,24 @@ const AIQuotaResetSchema = z.object({
   }),
 })
 
+// ── Feature Flags ────────────────────────────────────────────────────────────
+const FeatureFlagSetSchema = z.object({
+  tier: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
+  flags: z.object({
+    advanced_analytics: z.boolean(),
+    ai_recommendations: z.boolean(),
+    multi_currency: z.boolean(),
+    offline_mode: z.boolean(),
+  }),
+  quotas: z.object({
+    api_requests_per_day: z.number().int().min(0),
+    // -1 = unlimited (Enterprise)
+    max_users: z.number().int().min(-1),
+    max_storage_mb: z.number().int().min(-1),
+    ai_tokens_per_month: z.number().int().min(0),
+  }),
+})
+
 const BillingEntrySchema = z.object({
   tenant_id: z.string().min(1, 'tenant_id is required'),
   entry_type: z.string().min(1, 'entry_type is required'),
@@ -1626,6 +1644,166 @@ app.post('/ai-quotas/:tenantId/reset', async (c) => {
     }
 
     return c.json(apiResponse(true, { tenantId, resetType, resetAt: new Date().toISOString() }))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+// ============================================================================
+// FEATURE FLAG ENDPOINTS
+// ============================================================================
+//
+// KV key format : ff:{tenantId}
+// KV namespace  : FEATURE_FLAGS_KV
+//
+// Downstream vertical workers read flags with a single KV lookup:
+//   const config = await FEATURE_FLAGS_KV.get('ff:tenant-xyz', 'json')
+//
+// KV value JSON schema (TenantFeatureConfig):
+//   {
+//     tenant_id       : string                              — tenant identifier
+//     tier            : "STARTER" | "PROFESSIONAL" | "ENTERPRISE"
+//     flags: {
+//       advanced_analytics  : boolean  — ff-001: Advanced analytics dashboard
+//       ai_recommendations  : boolean  — ff-002: ML-based recommendations engine
+//       multi_currency      : boolean  — ff-003: Multi-currency (NGN + USD + GHS …)
+//       offline_mode        : boolean  — ff-004: Progressive offline-first mode
+//     },
+//     quotas: {
+//       api_requests_per_day  : number  — daily API call cap (-1 = unlimited)
+//       max_users             : number  — user seat limit (-1 = unlimited)
+//       max_storage_mb        : number  — storage cap in MiB (-1 = unlimited)
+//       ai_tokens_per_month   : number  — monthly AI token budget (0 = disabled)
+//     },
+//     updated_at : ISO 8601 timestamp of last write
+//     updated_by : email of the super-admin who last wrote this record
+//   }
+//
+// Tier defaults (applied on GET when no KV record exists):
+//   STARTER      : all flags false except offline_mode=true; low quotas
+//   PROFESSIONAL : advanced_analytics & ai_recommendations enabled; full quotas
+//   ENTERPRISE   : all flags true; unlimited users/storage
+// ============================================================================
+
+/** Per-tier default feature configs */
+const TIER_DEFAULTS: Record<string, { flags: Record<string, boolean>; quotas: Record<string, number> }> = {
+  STARTER: {
+    flags: { advanced_analytics: false, ai_recommendations: false, multi_currency: false, offline_mode: true },
+    quotas: { api_requests_per_day: 1000, max_users: 10, max_storage_mb: 5120, ai_tokens_per_month: 0 },
+  },
+  PROFESSIONAL: {
+    flags: { advanced_analytics: true, ai_recommendations: true, multi_currency: false, offline_mode: true },
+    quotas: { api_requests_per_day: 10000, max_users: 100, max_storage_mb: 51200, ai_tokens_per_month: 500000 },
+  },
+  ENTERPRISE: {
+    flags: { advanced_analytics: true, ai_recommendations: true, multi_currency: true, offline_mode: true },
+    quotas: { api_requests_per_day: 100000, max_users: -1, max_storage_mb: -1, ai_tokens_per_month: 1000000 },
+  },
+}
+
+/**
+ * GET /feature-flags/:tenantId
+ * Read feature flags for a tenant from FEATURE_FLAGS_KV.
+ * Falls back to tier-based defaults if no record exists.
+ */
+app.get('/feature-flags/:tenantId', async (c) => {
+  try {
+    await requirePermission(c, 'read:tenants')
+
+    const tenantId = c.req.param('tenantId')
+
+    // Fast global read from KV
+    const stored = await c.env.FEATURE_FLAGS_KV.get(`ff:${tenantId}`, 'json') as any
+
+    if (stored) {
+      return c.json(apiResponse(true, { ...stored, is_default: false }))
+    }
+
+    // No record — derive tier from TENANTS_DB then return defaults
+    const tenant = await c.env.TENANTS_DB.prepare(
+      `SELECT tier FROM tenants WHERE id = ?`
+    ).bind(tenantId).first()
+
+    const tier = (tenant?.tier as string) || 'STARTER'
+    const defaults = TIER_DEFAULTS[tier] || TIER_DEFAULTS.STARTER
+
+    return c.json(
+      apiResponse(true, {
+        tenant_id: tenantId,
+        tier,
+        flags: defaults.flags,
+        quotas: defaults.quotas,
+        is_default: true,
+      })
+    )
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+/**
+ * PUT /feature-flags/:tenantId
+ * Write (or replace) feature flags for a tenant in FEATURE_FLAGS_KV.
+ * Full object must be supplied — use GET first to read existing values.
+ */
+app.put('/feature-flags/:tenantId', async (c) => {
+  try {
+    await requirePermission(c, 'write:tenants')
+
+    const tenantId = c.req.param('tenantId')
+    const authPayload = await getAuthPayload(c)
+    const body = parseBody(FeatureFlagSetSchema, await c.req.json())
+
+    const config = {
+      tenant_id: tenantId,
+      tier: body.tier,
+      flags: body.flags,
+      quotas: body.quotas,
+      updated_at: new Date().toISOString(),
+      updated_by: authPayload?.email || 'system',
+    }
+
+    // Persist to KV — no TTL; flags are long-lived configuration
+    await c.env.FEATURE_FLAGS_KV.put(`ff:${tenantId}`, JSON.stringify(config))
+
+    // Audit trail
+    await c.env.TENANTS_DB.prepare(
+      `INSERT OR IGNORE INTO audit_logs
+         (id, user_id, action, resource_type, resource_id, new_value, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(
+      generateId('afl'),
+      authPayload?.sub || 'system',
+      'UPDATE_FEATURE_FLAGS',
+      'tenant_feature_flags',
+      tenantId,
+      JSON.stringify({ tier: body.tier, flags: body.flags }),
+    ).run().catch(() => {}) // non-fatal
+
+    return c.json(apiResponse(true, config))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+/**
+ * DELETE /feature-flags/:tenantId
+ * Remove the custom feature flag record for a tenant, reverting to tier defaults.
+ */
+app.delete('/feature-flags/:tenantId', async (c) => {
+  try {
+    await requirePermission(c, 'write:tenants')
+
+    const tenantId = c.req.param('tenantId')
+    await c.env.FEATURE_FLAGS_KV.delete(`ff:${tenantId}`)
+
+    return c.json(apiResponse(true, {
+      tenant_id: tenantId,
+      message: 'Feature flags reset to tier defaults',
+    }))
   } catch (err) {
     if (err instanceof HTTPException) throw err
     throw new HTTPException(500, { message: 'Internal server error' })

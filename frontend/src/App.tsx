@@ -29,6 +29,7 @@ import AuditLog from "./pages/AuditLog";
 import PartnerManagement from "./pages/PartnerManagement";
 import OperationsOverview from "./pages/OperationsOverview";
 import DeploymentManager from "./pages/DeploymentManager";
+import FeatureFlagManager from "./pages/FeatureFlagManager";
 
 function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -179,6 +180,19 @@ function AppRouter() {
           <ProtectedRoute requiredPermission="manage:deployments">
             <DashboardLayout>
               <DeploymentManager />
+            </DashboardLayout>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
+      </Route>
+
+      {/* Feature Flag Manager */}
+      <Route path={"/feature-flags"}>
+        {isAuthenticated ? (
+          <ProtectedRoute requiredPermission="write:tenants">
+            <DashboardLayout>
+              <FeatureFlagManager />
             </DashboardLayout>
           </ProtectedRoute>
         ) : (

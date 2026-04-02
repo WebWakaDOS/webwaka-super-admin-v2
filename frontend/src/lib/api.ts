@@ -320,6 +320,55 @@ export class ApiClient {
     return this.get<{ enabled: boolean }>('/auth/2fa/status')
   }
 
+  // ── Feature Flags ─────────────────────────────────────────────────────────
+
+  async getFeatureFlags(tenantId: string) {
+    return this.get<{
+      tenant_id: string
+      tier: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'
+      flags: {
+        advanced_analytics: boolean
+        ai_recommendations: boolean
+        multi_currency: boolean
+        offline_mode: boolean
+      }
+      quotas: {
+        api_requests_per_day: number
+        max_users: number
+        max_storage_mb: number
+        ai_tokens_per_month: number
+      }
+      updated_at?: string
+      updated_by?: string
+      is_default: boolean
+    }>(`/feature-flags/${tenantId}`)
+  }
+
+  async setFeatureFlags(
+    tenantId: string,
+    data: {
+      tier: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'
+      flags: {
+        advanced_analytics: boolean
+        ai_recommendations: boolean
+        multi_currency: boolean
+        offline_mode: boolean
+      }
+      quotas: {
+        api_requests_per_day: number
+        max_users: number
+        max_storage_mb: number
+        ai_tokens_per_month: number
+      }
+    }
+  ) {
+    return this.put(`/feature-flags/${tenantId}`, data)
+  }
+
+  async resetFeatureFlags(tenantId: string) {
+    return this.delete(`/feature-flags/${tenantId}`)
+  }
+
   // ── WebSocket ─────────────────────────────────────────────────────────────
   // The browser automatically includes the HttpOnly auth cookie on WebSocket
   // connections to the same domain — no token parameter needed.
