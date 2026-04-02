@@ -351,6 +351,15 @@ async function requirePermission(c: any, permission: string): Promise<void> {
   if (!allowed) throw new HTTPException(403, { message: 'Forbidden' })
 }
 
+/**
+ * requireAuth — throws 401 if no valid JWT is present. Returns the decoded payload.
+ * Use this for endpoints that need authentication but not a specific permission.
+ */
+async function requireAuth(c: any): Promise<any> {
+  const payload = await getAuthPayload(c)
+  if (!payload) throw new HTTPException(401, { message: 'Unauthorized' })
+  return payload
+}
 async function getTenantId(c: any): Promise<string> {
   const payload = await getAuthPayload(c)
   // tenantId ALWAYS from JWT payload — NEVER from request headers
