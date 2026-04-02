@@ -87,13 +87,9 @@ jobs:
         working-directory: workers
         run: pnpm install
 
-      - name: Build Workers
-        working-directory: workers
-        run: pnpm build
-
       - name: Deploy to Cloudflare Workers
         working-directory: workers
-        run: pnpm run deploy:production
+        run: npx wrangler deploy --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -143,10 +139,6 @@ jobs:
       - name: Install dependencies
         working-directory: workers
         run: pnpm install
-
-      - name: Build Workers
-        working-directory: workers
-        run: pnpm build
 
       - name: Deploy to Cloudflare Workers (Staging)
         working-directory: workers

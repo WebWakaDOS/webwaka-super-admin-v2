@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && esbuild src/index.ts --bundle --platform=node --target=es2020 --outfile=dist/index.js",
+    "build": "tsc --noEmit",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "deploy:staging": "wrangler deploy --env staging",
@@ -35,7 +35,7 @@
   "author": "WebWaka Team",
   "license": "MIT",
   "dependencies": {
-    "@webwaka/core": "file:../../webwaka-core",
+    "@webwaka/core": "^1.3.2",
     "hono": "^4.0.0"
   },
   "devDependencies": {

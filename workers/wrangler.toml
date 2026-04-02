@@ -57,7 +57,7 @@ id = "4b5552f38e8b4db89e696d23129745d3"
 
 [[env.staging.kv_namespaces]]
 binding = "RATE_LIMIT_KV"
-id = "REPLACE_WITH_STAGING_RATE_LIMIT_KV_ID"
+id = "fffa715813364aeda8dfd697f1f33948"
 # Create with: wrangler kv:namespace create RATE_LIMIT_KV --env staging
 
 # ============================================================================
@@ -114,29 +114,14 @@ id = "4b5552f38e8b4db89e696d23129745d3"
 
 [[env.production.kv_namespaces]]
 binding = "RATE_LIMIT_KV"
-id = "REPLACE_WITH_PRODUCTION_RATE_LIMIT_KV_ID"
+id = "daedd783ef6d45f781752c5c9e398633"
 # Create with: wrangler kv:namespace create RATE_LIMIT_KV --env production
 
-# ============================================================================
-# Build Configuration
-# ============================================================================
-[build]
-command = "npm run build"
-cwd = "."
-
-# ============================================================================
-# Migrations Configuration
-# ============================================================================
-[[migrations]]
-dir = "migrations"
-tag = "v1"
+# Build: wrangler handles bundling automatically via esbuild (no custom build command needed)
+# Migrations: applied manually via wrangler d1 execute commands (multi-DB setup)
 
 # ============================================================================
 # Observability
 # ============================================================================
 [observability]
 enabled = true
-
-# D1 Migrations are applied automatically before deployment
-# To apply migrations locally: wrangler d1 migrations apply <database> --local
-# To apply migrations remotely: wrangler d1 migrations apply <database> --remote
