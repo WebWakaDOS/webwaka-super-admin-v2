@@ -38,6 +38,14 @@ binding = "HEALTH_DB"
 database_name = "health_staging"
 database_id = "a22ca9a2-1581-491f-90b2-826f64601c9d"
 
+# Service Bindings (Staging)
+# Allows Super Admin V2 to call Commerce worker directly via Cloudflare Service Binding
+# (T-FND-03: Cross-repo tenant provisioning automation)
+[[env.staging.services]]
+binding = "COMMERCE_WORKER"
+service = "webwaka-commerce-api-staging"
+environment = "staging"
+
 # KV Namespace Bindings (Staging)
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS_KV"
@@ -94,6 +102,14 @@ database_id = "ee93377c-8000-45d6-ae54-f0d4c588bf04"
 binding = "HEALTH_DB"
 database_name = "health_prod"
 database_id = "a22ca9a2-1581-491f-90b2-826f64601c9d"
+
+# Service Bindings (Production)
+# Allows Super Admin V2 to call Commerce worker directly via Cloudflare Service Binding
+# (T-FND-03: Cross-repo tenant provisioning automation)
+[[env.production.services]]
+binding = "COMMERCE_WORKER"
+service = "webwaka-commerce-api-prod"
+environment = "production"
 
 # KV Namespace Bindings (Production)
 [[env.production.kv_namespaces]]

@@ -47,9 +47,13 @@ type Bindings = {
   NOTIFICATIONS_KV: KVNamespace
   RATE_LIMIT_KV: KVNamespace
 
+  // Service Bindings (T-FND-03: Cross-repo tenant provisioning)
+  COMMERCE_WORKER: Fetcher
+
   // Environment variables
   JWT_SECRET: string
   ENVIRONMENT: string
+  INTER_SERVICE_SECRET: string
 }
 
 type Context = HonoContext<{ Bindings: Bindings }>
@@ -127,6 +131,14 @@ const TenantCreateSchema = z.object({
   email: z.string().email('Valid email address is required'),
   industry: z.string().min(1, 'industry is required'),
   domain: z.string().optional(),
+  // T-FND-03: Additional fields for Commerce provisioning
+  type: z.enum(['retail', 'multi_vendor', 'vendor']).optional(),
+  modules: z.record(z.any()).optional(),
+  syncPreferences: z.record(z.any()).optional(),
+  theme: z.object({
+    primaryColor: z.string().optional(),
+    logoUrl: z.string().optional(),
+  }).optional(),
 })
 
 const TenantUpdateSchema = z.object({
@@ -704,21 +716,97 @@ app.get('/tenants', async (c) => {
 
 /**
  * POST /tenants
- * Create new tenant
+ * Create new tenant and provision across vertical workers (T-FND-03)
  */
 app.post('/tenants', async (c) => {
   try {
     await requirePermission(c, 'write:tenants')
 
-    const { name, email, industry, domain } = parseBody(TenantCreateSchema, await c.req.json())
+    const { name, email, industry, domain, type, modules, syncPreferences, theme } = parseBody(
+      TenantCreateSchema,
+      await c.req.json()
+    )
 
     const tenantId = generateId('tenant')
+
+    // Step 1: Create tenant record in Super Admin DB
     await c.env.TENANTS_DB.prepare(
       `INSERT INTO tenants (id, name, email, status, industry, domain, tenant_id, created_at, updated_at)
        VALUES (?, ?, ?, 'ACTIVE', ?, ?, 'super-admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     )
       .bind(tenantId, name, email, industry, domain || null)
       .run()
+
+    // Step 2: Provision tenant in Commerce worker via Service Binding
+    try {
+      const internalSecret = c.env.INTER_SERVICE_SECRET || 'default-secret'
+      const provisionResponse = await c.env.COMMERCE_WORKER.fetch(
+        'http://internal/internal/provision-tenant',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Secret': internalSecret,
+          },
+          body: JSON.stringify({
+            tenantId,
+            name,
+            type: type || 'retail',
+            domain: domain || `${tenantId}.webwaka.app`,
+            currency: 'NGN',
+            timezone: 'Africa/Lagos',
+            modules,
+            syncPreferences,
+            theme,
+          }),
+        }
+      )
+
+      const provisionResult: any = await provisionResponse.json()
+      if (!provisionResult.success) {
+        console.error('[PROVISION] Commerce provisioning failed:', provisionResult.error)
+        // Rollback: Delete tenant from TENANTS_DB
+        await c.env.TENANTS_DB.prepare('DELETE FROM tenants WHERE id = ?').bind(tenantId).run()
+        throw new HTTPException(500, { message: 'Failed to provision tenant in Commerce worker' })
+      }
+
+      console.log(`[PROVISION] Tenant ${tenantId} provisioned in Commerce worker`)
+    } catch (err) {
+      console.error('[PROVISION] Service binding call failed:', err)
+      // Rollback: Delete tenant from TENANTS_DB
+      await c.env.TENANTS_DB.prepare('DELETE FROM tenants WHERE id = ?').bind(tenantId).run()
+      throw new HTTPException(500, { message: 'Failed to communicate with Commerce worker' })
+    }
+
+    // Step 3: Emit tenant.provisioned event (unified WebWakaEvent<T> schema from T-FND-01)
+    try {
+      const event = {
+        event: 'tenant.provisioned',
+        tenantId,
+        payload: {
+          tenantId,
+          name,
+          email,
+          industry,
+          domain: domain || `${tenantId}.webwaka.app`,
+          type: type || 'retail',
+          provisionedAt: Date.now(),
+        },
+        timestamp: Date.now(),
+      }
+
+      // Publish to NOTIFICATIONS_KV for event bus (24h TTL)
+      await c.env.NOTIFICATIONS_KV.put(
+        `event:tenant.provisioned:${tenantId}:${Date.now()}`,
+        JSON.stringify(event),
+        { expirationTtl: 86400 }
+      )
+
+      console.log(`[EVENT] tenant.provisioned emitted for ${tenantId}`)
+    } catch (err) {
+      // Event emission failure should not block tenant creation
+      console.error('[EVENT] Failed to emit tenant.provisioned event:', err)
+    }
 
     return c.json(
       apiResponse(true, { id: tenantId, name, email, status: 'ACTIVE', industry, domain }),
