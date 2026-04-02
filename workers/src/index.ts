@@ -132,7 +132,7 @@ const TenantCreateSchema = z.object({
 const TenantUpdateSchema = z.object({
   name: z.string().optional(),
   email: z.string().email().optional(),
-  status: z.enum(['ACTIVE', 'SUSPENDED', 'PROVISIONING', 'ARCHIVED']).optional(),
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'TRIAL', 'CHURNED']).optional(),
   industry: z.string().optional(),
   domain: z.string().optional(),
 })
@@ -1724,8 +1724,8 @@ app.get('/tenants/stats', async (c) => {
           COUNT(*) as total,
           SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END) as active,
           SUM(CASE WHEN status = 'SUSPENDED' THEN 1 ELSE 0 END) as suspended,
-          SUM(CASE WHEN status = 'PROVISIONING' THEN 1 ELSE 0 END) as provisioning,
-          SUM(CASE WHEN status = 'ARCHIVED' THEN 1 ELSE 0 END) as archived
+          SUM(CASE WHEN status = 'TRIAL' THEN 1 ELSE 0 END) as trial,
+          SUM(CASE WHEN status = 'CHURNED' THEN 1 ELSE 0 END) as churned
          FROM tenants WHERE deleted_at IS NULL`
       ).first(),
       c.env.BILLING_DB.prepare(
@@ -1740,8 +1740,8 @@ app.get('/tenants/stats', async (c) => {
       totalTenants: Number(counts?.total || 0),
       activeTenants: Number(counts?.active || 0),
       suspendedTenants: Number(counts?.suspended || 0),
-      provisioningTenants: Number(counts?.provisioning || 0),
-      archivedTenants: Number(counts?.archived || 0),
+      trialTenants: Number(counts?.trial || 0),
+      churnedTenants: Number(counts?.churned || 0),
       totalRevenueKobo: Number(revenue?.total_revenue_kobo || 0),
       totalCommissionKobo: Number(revenue?.total_commission_kobo || 0),
     }))
