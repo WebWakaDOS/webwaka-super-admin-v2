@@ -494,6 +494,7 @@ app.post('/auth/login', async (c) => {
       {
         sub: result.id as string,
         email: result.email as string,
+        name: `${result.first_name} ${result.last_name}`,
         tenantId: result.tenant_id as string,
         role: result.role as string,
         permissions,
@@ -549,6 +550,7 @@ app.post('/auth/refresh', async (c) => {
       {
         sub: payload.sub,
         email: payload.email,
+        name: payload.name,
         tenantId: payload.tenantId,
         role: payload.role,
         permissions: payload.permissions,
@@ -591,6 +593,7 @@ app.get('/auth/me', async (c) => {
       apiResponse(true, {
         id: payload.sub,
         email: payload.email,
+        name: payload.name,
         tenantId: payload.tenantId,
         role: payload.role,
         permissions: payload.permissions,

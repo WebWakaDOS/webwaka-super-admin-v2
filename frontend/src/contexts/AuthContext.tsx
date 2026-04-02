@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const freshUser: User = {
           id: serverUser.id,
           email: serverUser.email,
-          name: serverUser.name,
+          name: serverUser.name || serverUser.email?.split('@')[0] || 'Admin',
           role: (serverUser.role === 'super-admin' ? 'super_admin' : serverUser.role) as UserRole,
           permissions: serverUser.permissions || [],
           avatar: serverUser.avatar,
