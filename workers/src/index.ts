@@ -1654,11 +1654,15 @@ app.post('/ai-quotas/:tenantId/reset', async (c) => {
 // FEATURE FLAG ENDPOINTS
 // ============================================================================
 //
-// KV key format : ff:{tenantId}
+// KV key format : tenant:{tenantId}:flags
 // KV namespace  : FEATURE_FLAGS_KV
 //
+// Key pattern is consistent with the module registry which writes:
+//   tenant:{tenantId}:module:{moduleId}
+// This allows listing all keys for a tenant with prefix "tenant:{tenantId}:"
+//
 // Downstream vertical workers read flags with a single KV lookup:
-//   const config = await FEATURE_FLAGS_KV.get('ff:tenant-xyz', 'json')
+//   const config = await FEATURE_FLAGS_KV.get(`tenant:${tenantId}:flags`, 'json')
 //
 // KV value JSON schema (TenantFeatureConfig):
 //   {
@@ -1714,7 +1718,7 @@ app.get('/feature-flags/:tenantId', async (c) => {
     const tenantId = c.req.param('tenantId')
 
     // Fast global read from KV
-    const stored = await c.env.FEATURE_FLAGS_KV.get(`ff:${tenantId}`, 'json') as any
+    const stored = await c.env.FEATURE_FLAGS_KV.get(`tenant:${tenantId}:flags`, 'json') as any
 
     if (stored) {
       return c.json(apiResponse(true, { ...stored, is_default: false }))
@@ -1756,6 +1760,17 @@ app.put('/feature-flags/:tenantId', async (c) => {
     const authPayload = await getAuthPayload(c)
     const body = parseBody(FeatureFlagSetSchema, await c.req.json())
 
+    // Bug fix #2: Verify the tenant exists before writing to KV.
+    // Without this check, super-admins could create orphan KV entries
+    // for arbitrary (non-existent) tenant IDs.
+    const tenantExists = await c.env.TENANTS_DB.prepare(
+      `SELECT id FROM tenants WHERE id = ?`
+    ).bind(tenantId).first()
+
+    if (!tenantExists) {
+      throw new HTTPException(404, { message: `Tenant '${tenantId}' not found` })
+    }
+
     const config = {
       tenant_id: tenantId,
       tier: body.tier,
@@ -1766,7 +1781,7 @@ app.put('/feature-flags/:tenantId', async (c) => {
     }
 
     // Persist to KV — no TTL; flags are long-lived configuration
-    await c.env.FEATURE_FLAGS_KV.put(`ff:${tenantId}`, JSON.stringify(config))
+    await c.env.FEATURE_FLAGS_KV.put(`tenant:${tenantId}:flags`, JSON.stringify(config))
 
     // Audit trail
     await c.env.TENANTS_DB.prepare(
@@ -1798,7 +1813,7 @@ app.delete('/feature-flags/:tenantId', async (c) => {
     await requirePermission(c, 'write:tenants')
 
     const tenantId = c.req.param('tenantId')
-    await c.env.FEATURE_FLAGS_KV.delete(`ff:${tenantId}`)
+    await c.env.FEATURE_FLAGS_KV.delete(`tenant:${tenantId}:flags`)
 
     return c.json(apiResponse(true, {
       tenant_id: tenantId,

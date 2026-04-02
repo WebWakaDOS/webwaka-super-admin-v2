@@ -153,13 +153,20 @@ export default function FeatureFlagManager() {
   const [saving, setSaving] = useState(false)
   const [schemaOpen, setSchemaOpen] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
+  // Bug fix #3: track the latest requested tenantId so stale responses
+  // from a previous fetch can be discarded when the user switches tenants quickly.
+  const latestTenantRef = useState<{ id: string }>({ id: '' })[0]
 
   const loadFlags = useCallback(async (tenantId: string) => {
     if (!tenantId) return
+    latestTenantRef.id = tenantId
     setLoading(true)
     setDirty(false)
     try {
       const res = await apiClient.getFeatureFlags(tenantId)
+      // Discard if the user already switched to a different tenant
+      if (latestTenantRef.id !== tenantId) return
       if (res.success && res.data) {
         setConfig(res.data)
         setDraft({ tier: res.data.tier, flags: { ...res.data.flags }, quotas: { ...res.data.quotas } })
@@ -167,11 +174,12 @@ export default function FeatureFlagManager() {
         toast.error(res.error || 'Failed to load feature flags')
       }
     } catch {
+      if (latestTenantRef.id !== tenantId) return
       toast.error('Could not reach the API. Is the Workers backend running?')
     } finally {
-      setLoading(false)
+      if (latestTenantRef.id === tenantId) setLoading(false)
     }
-  }, [])
+  }, [latestTenantRef])
 
   useEffect(() => {
     if (selectedTenantId) loadFlags(selectedTenantId)
@@ -200,6 +208,28 @@ export default function FeatureFlagManager() {
 
   const handleSave = async () => {
     if (!draft || !selectedTenantId) return
+
+    // Bug fix #5: validate quota values before submitting.
+    // The Zod schema enforces integers, but we catch out-of-range values here
+    // so the user gets immediate feedback instead of a network round-trip error.
+    const quotaErrors: string[] = []
+    if (draft.quotas.api_requests_per_day < 0) {
+      quotaErrors.push('API Requests / Day must be ≥ 0')
+    }
+    if (draft.quotas.max_users < -1) {
+      quotaErrors.push('Max Users must be ≥ -1 (use -1 for unlimited)')
+    }
+    if (draft.quotas.max_storage_mb < -1) {
+      quotaErrors.push('Max Storage must be ≥ -1 (use -1 for unlimited)')
+    }
+    if (draft.quotas.ai_tokens_per_month < 0) {
+      quotaErrors.push('AI Tokens / Month must be ≥ 0 (use 0 to disable)')
+    }
+    if (quotaErrors.length > 0) {
+      quotaErrors.forEach((e) => toast.error(e))
+      return
+    }
+
     setSaving(true)
     try {
       const res = await apiClient.setFeatureFlags(selectedTenantId, draft)
@@ -216,13 +246,19 @@ export default function FeatureFlagManager() {
     }
   }
 
-  const handleReset = async () => {
+  // Bug fix #4: confirmReset drives a two-step confirmation before deletion.
+  const handleResetRequest = () => {
+    setConfirmReset(true)
+  }
+
+  const handleResetConfirm = async () => {
+    setConfirmReset(false)
     if (!selectedTenantId) return
     setSaving(true)
     try {
       const res = await apiClient.resetFeatureFlags(selectedTenantId)
       if (res.success) {
-        toast.success('Reset to tier defaults')
+        toast.success('Feature flags reset to tier defaults')
         await loadFlags(selectedTenantId)
       } else {
         toast.error(res.error || 'Reset failed')
@@ -425,20 +461,46 @@ export default function FeatureFlagManager() {
               </Card>
 
               {/* Action bar */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <Button onClick={handleSave} disabled={saving || !dirty} className="min-w-[120px]">
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? 'Saving…' : 'Save to KV'}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleReset}
-                  disabled={saving || config?.is_default}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset to Defaults
-                </Button>
-                {config?.is_default && (
+
+                {/* Bug fix #4: two-step confirmation before destructive KV delete */}
+                {confirmReset ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/5 px-3 py-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    <span className="text-sm text-destructive font-medium">Delete custom config?</span>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={handleResetConfirm}
+                      disabled={saving}
+                    >
+                      Confirm Reset
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setConfirmReset(false)}
+                      disabled={saving}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={handleResetRequest}
+                    disabled={saving || config?.is_default}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset to Defaults
+                  </Button>
+                )}
+
+                {config?.is_default && !confirmReset && (
                   <span className="text-xs text-muted-foreground">Already using tier defaults.</span>
                 )}
               </div>
@@ -466,15 +528,18 @@ export default function FeatureFlagManager() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm font-medium mb-1">KV Key Format</p>
-              <code className="block bg-muted rounded p-3 text-xs">ff:{'{tenantId}'}</code>
+              <code className="block bg-muted rounded p-3 text-xs">tenant:{'{tenantId}'}:flags</code>
               <p className="text-xs text-muted-foreground mt-1">
-                One key per tenant. All flags and quotas for that tenant are stored in a single JSON value.
+                One key per tenant. Consistent with the module registry pattern{' '}
+                <code className="bg-background px-1 rounded">tenant:{'{tenantId}'}:module:{'{moduleId}'}</code>{' '}
+                — all tenant-scoped keys share the <code className="bg-background px-1 rounded">tenant:{'{tenantId}'}:</code> prefix,
+                making it easy to list every KV record for a given tenant.
               </p>
             </div>
             <div>
               <p className="text-sm font-medium mb-1">Reading from a Vertical Worker</p>
               <pre className="bg-muted rounded p-3 text-xs overflow-x-auto">{`// workers/src/index.ts (any vertical suite)
-const config = await env.FEATURE_FLAGS_KV.get(\`ff:\${tenantId}\`, 'json')
+const config = await env.FEATURE_FLAGS_KV.get(\`tenant:\${tenantId}:flags\`, 'json')
 
 if (config?.flags?.advanced_analytics) {
   // render advanced dashboard
