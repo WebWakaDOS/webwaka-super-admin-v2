@@ -24,7 +24,7 @@ interface Tenant {
   id: string
   name: string
   email: string
-  status: 'active' | 'suspended' | 'provisioning'
+  status: 'ACTIVE' | 'SUSPENDED' | 'TRIAL' | 'CHURNED'
   plan: 'starter' | 'professional' | 'enterprise'
   createdAt: string
   users?: number
@@ -133,7 +133,7 @@ export default function TenantManagement() {
     try {
       await Promise.all(
         [...selectedIds].map((id) =>
-          apiClient.put(`/tenants/${id}`, { status: 'suspended' }).catch(() => null)
+          apiClient.put(`/tenants/${id}`, { status: 'SUSPENDED' }).catch(() => null)
         )
       )
       toast.success(`Suspended ${selectedIds.size} tenant(s)`)
@@ -231,9 +231,10 @@ export default function TenantManagement() {
   }
 
   const statusColor = (status: Tenant['status']) =>
-    status === 'active' ? 'bg-green-100 text-green-800'
-    : status === 'suspended' ? 'bg-red-100 text-red-800'
-    : 'bg-yellow-100 text-yellow-800'
+    status === 'ACTIVE' ? 'bg-green-100 text-green-800'
+    : status === 'SUSPENDED' ? 'bg-red-100 text-red-800'
+    : status === 'TRIAL' ? 'bg-yellow-100 text-yellow-800'
+    : 'bg-gray-100 text-gray-800'
 
   const totalPages = Math.ceil(pagination.total / PAGE_SIZE)
 

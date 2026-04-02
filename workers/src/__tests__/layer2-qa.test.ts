@@ -56,6 +56,17 @@ describe('Schema Validation', () => {
     expect(vendors).toContain('byok')
   })
 
+  it('should define TenantStatus as ACTIVE | SUSPENDED | TRIAL | CHURNED', () => {
+    const validStatuses = ['ACTIVE', 'SUSPENDED', 'TRIAL', 'CHURNED']
+    expect(validStatuses).toHaveLength(4)
+    expect(validStatuses).toContain('ACTIVE')
+    expect(validStatuses).toContain('SUSPENDED')
+    expect(validStatuses).toContain('TRIAL')
+    expect(validStatuses).toContain('CHURNED')
+    expect(validStatuses).not.toContain('PROVISIONING')
+    expect(validStatuses).not.toContain('ARCHIVED')
+  })
+
   it('should correctly format kobo to naira', () => {
     const kobo = 500000
     const naira = kobo / 100

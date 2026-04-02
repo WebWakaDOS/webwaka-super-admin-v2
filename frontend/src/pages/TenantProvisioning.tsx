@@ -308,7 +308,7 @@ export default function TenantProvisioning() {
         industry: state.basic.industry,
         plan: state.plan,
         suites: state.suites,
-        status: 'provisioning',
+        status: 'TRIAL',
       })
       if (!res.success) throw new Error(res.error || 'Failed to create tenant')
       const tenantId = (res.data as any)?.id || (res.data as any)?.tenantId || 'new-tenant'

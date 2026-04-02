@@ -8,7 +8,7 @@ export interface DashboardMetrics {
   platformHealth: number
   activeTenantsCount: number
   suspendedTenantsCount: number
-  provisioningTenantsCount: number
+  trialTenantsCount: number
 }
 
 export interface RevenueData {
@@ -93,9 +93,9 @@ export function useDashboardData() {
           ? (tenantsResult.value.data as any[]) || []
           : []
 
-      const activeTenants = tenants.filter((t: any) => t.status === 'active').length
-      const suspendedTenants = tenants.filter((t: any) => t.status === 'suspended').length
-      const provisioningTenants = tenants.filter((t: any) => t.status === 'provisioning').length
+      const activeTenants = tenants.filter((t: any) => t.status === 'ACTIVE').length
+      const suspendedTenants = tenants.filter((t: any) => t.status === 'SUSPENDED').length
+      const trialTenants = tenants.filter((t: any) => t.status === 'TRIAL').length
 
       // ── Modules ───────────────────────────────────────────────────────────
       const modules: any[] =
@@ -121,7 +121,7 @@ export function useDashboardData() {
         platformHealth: platformHealthPercentage,
         activeTenantsCount: activeTenants,
         suspendedTenantsCount: suspendedTenants,
-        provisioningTenantsCount: provisioningTenants,
+        trialTenantsCount: trialTenants,
       })
 
       setRevenueData((billingData as any)?.monthlyData || FALLBACK_REVENUE)
@@ -129,7 +129,7 @@ export function useDashboardData() {
       setTenantDistribution([
         { name: 'Active', value: activeTenants, color: '#10B981' },
         { name: 'Suspended', value: suspendedTenants, color: '#EF4444' },
-        { name: 'Provisioning', value: provisioningTenants, color: '#F59E0B' },
+        { name: 'Trial', value: trialTenants, color: '#F59E0B' },
       ])
 
       setActivityData((healthMetrics as any)?.hourlyData || FALLBACK_ACTIVITY)

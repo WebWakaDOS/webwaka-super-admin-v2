@@ -34,7 +34,7 @@ export interface TenantConfig {
   name: string;
   email?: string;
   domain: string;
-  status: 'active' | 'suspended' | 'provisioning' | 'archived';
+  status: 'ACTIVE' | 'SUSPENDED' | 'TRIAL' | 'CHURNED';
   plan: 'starter' | 'professional' | 'enterprise';
   industry?: string;
   enabledModules: string[];
@@ -72,10 +72,10 @@ export interface TenantContextType {
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 export const VALID_TRANSITIONS: Record<TenantConfig['status'], TenantConfig['status'][]> = {
-  provisioning: ['active', 'archived'],
-  active: ['suspended', 'archived'],
-  suspended: ['active', 'archived'],
-  archived: [],
+  TRIAL:     ['ACTIVE', 'CHURNED'],
+  ACTIVE:    ['SUSPENDED', 'CHURNED'],
+  SUSPENDED: ['ACTIVE', 'CHURNED'],
+  CHURNED:   [],
 };
 
 export function isValidStatusTransition(
@@ -86,12 +86,15 @@ export function isValidStatusTransition(
 }
 
 function normaliseStatus(raw: string): TenantConfig['status'] {
-  const s = raw.toLowerCase();
-  if (s === 'active') return 'active';
-  if (s === 'suspended') return 'suspended';
-  if (s === 'provisioning') return 'provisioning';
-  if (s === 'archived') return 'archived';
-  return 'active';
+  const s = raw.toUpperCase();
+  if (s === 'ACTIVE') return 'ACTIVE';
+  if (s === 'SUSPENDED') return 'SUSPENDED';
+  if (s === 'TRIAL') return 'TRIAL';
+  if (s === 'CHURNED') return 'CHURNED';
+  // Map legacy values from pre-012 migrations
+  if (s === 'PROVISIONING') return 'TRIAL';
+  if (s === 'ARCHIVED') return 'CHURNED';
+  return 'ACTIVE';
 }
 
 function normalisePlan(raw: string | undefined): TenantConfig['plan'] {
@@ -149,7 +152,7 @@ function mapApiTenant(raw: ApiTenantRow): TenantConfig {
     name: raw.name,
     email: raw.email,
     domain: raw.domain ?? `${raw.id}.webwaka.app`,
-    status: normaliseStatus(raw.status || 'active'),
+    status: normaliseStatus(raw.status || 'ACTIVE'),
     plan: normalisePlan(raw.plan),
     industry: raw.industry,
     enabledModules,

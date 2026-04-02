@@ -14,8 +14,8 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/contexts/TenantContext', () => ({
   useTenant: () => ({
     tenants: [
-      { id: '1', name: 'Tenant 1', status: 'active' },
-      { id: '2', name: 'Tenant 2', status: 'suspended' },
+      { id: '1', name: 'Tenant 1', status: 'ACTIVE' },
+      { id: '2', name: 'Tenant 2', status: 'SUSPENDED' },
     ],
   }),
 }))
@@ -92,10 +92,10 @@ describe('Dashboard Page', () => {
     const mockTenantsData = {
       success: true,
       data: [
-        { id: '1', name: 'Tenant 1', status: 'active' },
-        { id: '2', name: 'Tenant 2', status: 'active' },
-        { id: '3', name: 'Tenant 3', status: 'suspended' },
-        { id: '4', name: 'Tenant 4', status: 'provisioning' },
+        { id: '1', name: 'Tenant 1', status: 'ACTIVE' },
+        { id: '2', name: 'Tenant 2', status: 'ACTIVE' },
+        { id: '3', name: 'Tenant 3', status: 'SUSPENDED' },
+        { id: '4', name: 'Tenant 4', status: 'TRIAL' },
       ],
     }
 

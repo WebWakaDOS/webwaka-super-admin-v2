@@ -28,7 +28,7 @@ describe('TenantManagement Page', () => {
       id: '1',
       name: 'TechCorp Nigeria',
       email: 'admin@techcorp.ng',
-      status: 'active' as const,
+      status: 'ACTIVE' as const,
       plan: 'enterprise' as const,
       createdAt: '2026-01-15',
     },
@@ -36,7 +36,7 @@ describe('TenantManagement Page', () => {
       id: '2',
       name: 'RetailHub Lagos',
       email: 'info@retailhub.ng',
-      status: 'active' as const,
+      status: 'ACTIVE' as const,
       plan: 'professional' as const,
       createdAt: '2026-02-01',
     },
@@ -92,7 +92,7 @@ describe('TenantManagement Page', () => {
     await waitFor(() => {
       expect(screen.getByText('admin@techcorp.ng')).toBeDefined()
       expect(screen.getByText('enterprise')).toBeDefined()
-      expect(screen.getByText('active')).toBeDefined()
+      expect(screen.getByText('ACTIVE')).toBeDefined()
     })
   })
 
@@ -123,7 +123,7 @@ describe('TenantManagement Page', () => {
     const newTenantData = {
       name: 'New Startup',
       email: 'admin@newstartup.ng',
-      status: 'provisioning' as const,
+      status: 'TRIAL' as const,
       plan: 'starter' as const,
     }
 
@@ -167,7 +167,7 @@ describe('TenantManagement Page', () => {
     const updatedData = {
       name: 'TechCorp Nigeria Updated',
       email: 'newemail@techcorp.ng',
-      status: 'suspended' as const,
+      status: 'SUSPENDED' as const,
       plan: 'professional' as const,
     }
 
@@ -273,7 +273,7 @@ describe('TenantManagement Page', () => {
     render(<TenantManagement />)
 
     await waitFor(() => {
-      const activeBadges = screen.getAllByText('active')
+      const activeBadges = screen.getAllByText('ACTIVE')
       expect(activeBadges.length).toBeGreaterThan(0)
     })
   })
@@ -343,7 +343,7 @@ describe('TenantManagement Page', () => {
                 id: '3',
                 name: 'New Tenant',
                 email: 'new@example.com',
-                status: 'provisioning',
+                status: 'TRIAL',
                 plan: 'starter',
                 createdAt: new Date().toISOString(),
               },

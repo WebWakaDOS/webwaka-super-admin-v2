@@ -23,7 +23,7 @@ export interface TenantFormData {
   id?: string
   name: string
   email: string
-  status: 'active' | 'suspended' | 'provisioning'
+  status: 'ACTIVE' | 'SUSPENDED' | 'TRIAL' | 'CHURNED'
   plan: 'starter' | 'professional' | 'enterprise'
 }
 
@@ -48,7 +48,7 @@ export function TenantForm({
     initialData || {
       name: '',
       email: '',
-      status: 'provisioning',
+      status: 'TRIAL',
       plan: 'starter',
     }
   )
@@ -60,7 +60,7 @@ export function TenantForm({
       setFormData({
         name: '',
         email: '',
-        status: 'provisioning',
+        status: 'TRIAL',
         plan: 'starter',
       })
       onOpenChange(false)
@@ -123,9 +123,10 @@ export function TenantForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-                <SelectItem value="provisioning">Provisioning</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                <SelectItem value="TRIAL">Trial</SelectItem>
+                <SelectItem value="CHURNED">Churned</SelectItem>
               </SelectContent>
             </Select>
           </div>
