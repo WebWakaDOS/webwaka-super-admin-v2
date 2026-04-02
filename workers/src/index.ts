@@ -738,8 +738,21 @@ app.post('/tenants', async (c) => {
       .run()
 
     // Step 2: Provision tenant in Commerce worker via Service Binding
+    // BUG-02 FIX (T-FND-03 QA): Removed insecure '|| default-secret' fallback.
+    //   If INTER_SERVICE_SECRET is not configured, fail fast with 500 rather than
+    //   silently accepting 'default-secret' as a valid credential.
+    // BUG-04 FIX (T-FND-03 QA): Refactored rollback to a single path — the original
+    //   code had two separate DELETE calls (one inside the inner if-block and one in
+    //   the outer catch), causing a duplicate DELETE on provisioning failure.
     try {
-      const internalSecret = c.env.INTER_SERVICE_SECRET || 'default-secret'
+      const internalSecret = c.env.INTER_SERVICE_SECRET
+      if (!internalSecret) {
+        console.error('[PROVISION] INTER_SERVICE_SECRET is not configured — cannot provision tenant')
+        // Rollback: Delete tenant from TENANTS_DB before failing
+        await c.env.TENANTS_DB.prepare('DELETE FROM tenants WHERE id = ?').bind(tenantId).run()
+        throw new HTTPException(500, { message: 'Internal server configuration error' })
+      }
+
       const provisionResponse = await c.env.COMMERCE_WORKER.fetch(
         'http://internal/internal/provision-tenant',
         {
@@ -765,15 +778,16 @@ app.post('/tenants', async (c) => {
       const provisionResult: any = await provisionResponse.json()
       if (!provisionResult.success) {
         console.error('[PROVISION] Commerce provisioning failed:', provisionResult.error)
-        // Rollback: Delete tenant from TENANTS_DB
+        // Rollback: Delete tenant from TENANTS_DB (single rollback path — BUG-04 fix)
         await c.env.TENANTS_DB.prepare('DELETE FROM tenants WHERE id = ?').bind(tenantId).run()
         throw new HTTPException(500, { message: 'Failed to provision tenant in Commerce worker' })
       }
 
       console.log(`[PROVISION] Tenant ${tenantId} provisioned in Commerce worker`)
     } catch (err) {
-      console.error('[PROVISION] Service binding call failed:', err)
-      // Rollback: Delete tenant from TENANTS_DB
+      if (err instanceof HTTPException) throw err
+      // Unexpected error (network, JSON parse, etc.) — rollback and re-throw
+      console.error('[PROVISION] Service binding call failed unexpectedly:', err)
       await c.env.TENANTS_DB.prepare('DELETE FROM tenants WHERE id = ?').bind(tenantId).run()
       throw new HTTPException(500, { message: 'Failed to communicate with Commerce worker' })
     }
