@@ -30,6 +30,8 @@ import PartnerManagement from "./pages/PartnerManagement";
 import OperationsOverview from "./pages/OperationsOverview";
 import DeploymentManager from "./pages/DeploymentManager";
 import FeatureFlagManager from "./pages/FeatureFlagManager";
+// Phase 5 — Enhancement A: UI Builder Admin [SUP-1]
+import BuilderAdmin from "./pages/BuilderAdmin";
 
 function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -206,6 +208,19 @@ function AppRouter() {
           <ProtectedRoute requiredPermission="manage:settings">
             <DashboardLayout>
               <AuditLog />
+            </DashboardLayout>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
+      </Route>
+
+      {/* Builder Admin — Enhancement A: UI Builder [SUP-1] */}
+      <Route path={"/builder-admin"}>
+        {isAuthenticated ? (
+          <ProtectedRoute requiredPermission="manage:tenants">
+            <DashboardLayout>
+              <BuilderAdmin />
             </DashboardLayout>
           </ProtectedRoute>
         ) : (
