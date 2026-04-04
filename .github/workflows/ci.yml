@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master, develop, "feature/**", "fix/**", "chore/**"]
+    branches: [master, main]
   pull_request:
-    branches: [master, develop]
+    branches: [master, main]
 
 jobs:
   # ── Frontend type-check + build ────────────────────────────────────────────

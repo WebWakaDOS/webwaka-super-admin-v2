@@ -44,7 +44,7 @@ database_id = "a22ca9a2-1581-491f-90b2-826f64601c9d"
 [[env.staging.services]]
 binding = "COMMERCE_WORKER"
 service = "webwaka-commerce-api-staging"
-environment = "staging"
+# environment field removed — commerce worker is a standalone worker, not environment-based
 
 # KV Namespace Bindings (Staging)
 [[env.staging.kv_namespaces]]
@@ -109,7 +109,7 @@ database_id = "a22ca9a2-1581-491f-90b2-826f64601c9d"
 [[env.production.services]]
 binding = "COMMERCE_WORKER"
 service = "webwaka-commerce-api-prod"
-environment = "production"
+# environment field removed — commerce worker is a standalone worker, not environment-based
 
 # KV Namespace Bindings (Production)
 [[env.production.kv_namespaces]]
