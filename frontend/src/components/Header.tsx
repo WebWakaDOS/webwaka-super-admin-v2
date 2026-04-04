@@ -9,32 +9,50 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Search, Settings, LogOut } from 'lucide-react';
+import { Search, Settings, LogOut, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { NotificationBell } from '@/components/NotificationBell';
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
   const { tenants, currentTenant, switchTenant } = useTenant();
 
   return (
-    <header className="h-16 bg-card border-b border-border px-6 flex items-center justify-between">
-      {/* Search Bar */}
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search tenants, modules..."
-            className="pl-10 bg-muted border-muted-foreground/20"
-          />
+    <header className="h-16 bg-card border-b border-border px-4 lg:px-6 flex items-center justify-between shrink-0">
+      {/* Mobile Menu Button + Search */}
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden shrink-0"
+          onClick={onMenuClick}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+
+        {/* Search Bar */}
+        <div className="flex-1 max-w-md hidden sm:block">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search tenants, modules..."
+              className="pl-10 bg-muted border-muted-foreground/20"
+            />
+          </div>
         </div>
       </div>
 
       {/* Right Side Actions */}
-      <div className="flex items-center gap-4 ml-auto">
+      <div className="flex items-center gap-2 lg:gap-4 ml-2 shrink-0">
         {/* Language Switcher */}
-        <LanguageSwitcher />
+        <div className="hidden md:block">
+          <LanguageSwitcher />
+        </div>
 
         {/* Notifications */}
         <NotificationBell />
@@ -43,8 +61,8 @@ export function Header() {
         {tenants.length > 1 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                {currentTenant?.name || 'Select Tenant'}
+              <Button variant="outline" className="gap-2 hidden md:flex max-w-[160px]">
+                <span className="truncate">{currentTenant?.name || 'Select Tenant'}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">

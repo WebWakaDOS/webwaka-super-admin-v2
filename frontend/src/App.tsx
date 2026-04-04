@@ -32,6 +32,30 @@ import DeploymentManager from "./pages/DeploymentManager";
 import FeatureFlagManager from "./pages/FeatureFlagManager";
 // Phase 5 — Enhancement A: UI Builder Admin [SUP-1]
 import BuilderAdmin from "./pages/BuilderAdmin";
+// Phase 6 — 20 Backlog Enhancements
+import AIUsage from "./pages/AIUsage";
+import FraudAlerts from "./pages/FraudAlerts";
+import OnboardingWizard from "./pages/OnboardingWizard";
+import KYCQueue from "./pages/KYCQueue";
+import SubscriptionPlans from "./pages/SubscriptionPlans";
+import BulkNotifications from "./pages/BulkNotifications";
+import CustomDomains from "./pages/CustomDomains";
+import DataExport from "./pages/DataExport";
+import RBACEditor from "./pages/RBACEditor";
+import WebhookManager from "./pages/WebhookManager";
+import PlatformConfig from "./pages/PlatformConfig";
+import InactiveTenants from "./pages/InactiveTenants";
+import TenantImpersonation from "./pages/TenantImpersonation";
+
+function ProtectedPage({ children, permission }: { children: React.ReactNode; permission?: string }) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Login />;
+  return (
+    <ProtectedRoute requiredPermission={permission}>
+      <DashboardLayout>{children}</DashboardLayout>
+    </ProtectedRoute>
+  );
+}
 
 function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -57,175 +81,113 @@ function AppRouter() {
 
       {/* Protected Routes */}
       <Route path={"/"}>
-        {isAuthenticated ? (
-          <ProtectedRoute>
-            <DashboardLayout>
-              <Dashboard />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage>{isAuthenticated ? <Dashboard /> : <Login />}</ProtectedPage>
       </Route>
 
       <Route path={"/tenants"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="manage:tenants">
-            <DashboardLayout>
-              <TenantManagement />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="manage:tenants"><TenantManagement /></ProtectedPage>
       </Route>
 
       <Route path={"/tenant-provisioning"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="manage:tenants">
-            <DashboardLayout>
-              <TenantProvisioning />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="manage:tenants"><TenantProvisioning /></ProtectedPage>
       </Route>
 
       <Route path={"/modules"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="manage:modules">
-            <DashboardLayout>
-              <ModuleRegistry />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="manage:modules"><ModuleRegistry /></ProtectedPage>
       </Route>
 
       <Route path={"/billing"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="view:billing">
-            <DashboardLayout>
-              <Billing />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="view:billing"><Billing /></ProtectedPage>
       </Route>
 
       <Route path={"/analytics"}>
-        {isAuthenticated ? (
-          <ProtectedRoute>
-            <DashboardLayout>
-              <Analytics />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage><Analytics /></ProtectedPage>
       </Route>
 
       <Route path={"/health"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="view:health">
-            <DashboardLayout>
-              <SystemHealth />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="view:health"><SystemHealth /></ProtectedPage>
       </Route>
 
       <Route path={"/settings"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="manage:settings">
-            <DashboardLayout>
-              <SettingsPage />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="manage:settings"><SettingsPage /></ProtectedPage>
       </Route>
 
-      {/* Phase 4 — New Routes */}
+      {/* Phase 4 */}
       <Route path={"/partners"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="manage:partners">
-            <DashboardLayout>
-              <PartnerManagement />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="manage:partners"><PartnerManagement /></ProtectedPage>
       </Route>
 
       <Route path={"/operations"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="view:operations">
-            <DashboardLayout>
-              <OperationsOverview />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="view:operations"><OperationsOverview /></ProtectedPage>
       </Route>
 
       <Route path={"/deployments"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="manage:deployments">
-            <DashboardLayout>
-              <DeploymentManager />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="manage:deployments"><DeploymentManager /></ProtectedPage>
       </Route>
 
-      {/* Feature Flag Manager */}
       <Route path={"/feature-flags"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="write:tenants">
-            <DashboardLayout>
-              <FeatureFlagManager />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="write:tenants"><FeatureFlagManager /></ProtectedPage>
       </Route>
 
-      {/* Audit Log */}
       <Route path={"/audit-log"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="manage:settings">
-            <DashboardLayout>
-              <AuditLog />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="manage:settings"><AuditLog /></ProtectedPage>
       </Route>
 
-      {/* Builder Admin — Enhancement A: UI Builder [SUP-1] */}
       <Route path={"/builder-admin"}>
-        {isAuthenticated ? (
-          <ProtectedRoute requiredPermission="manage:tenants">
-            <DashboardLayout>
-              <BuilderAdmin />
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        <ProtectedPage permission="manage:tenants"><BuilderAdmin /></ProtectedPage>
+      </Route>
+
+      {/* Phase 6 — 20 Backlog Enhancements */}
+      <Route path={"/ai-usage"}>
+        <ProtectedPage><AIUsage /></ProtectedPage>
+      </Route>
+
+      <Route path={"/fraud-alerts"}>
+        <ProtectedPage permission="manage:security"><FraudAlerts /></ProtectedPage>
+      </Route>
+
+      <Route path={"/onboarding"}>
+        <ProtectedPage permission="manage:tenants"><OnboardingWizard /></ProtectedPage>
+      </Route>
+
+      <Route path={"/kyc-queue"}>
+        <ProtectedPage permission="manage:kyc"><KYCQueue /></ProtectedPage>
+      </Route>
+
+      <Route path={"/subscription-plans"}>
+        <ProtectedPage permission="manage:billing"><SubscriptionPlans /></ProtectedPage>
+      </Route>
+
+      <Route path={"/bulk-notifications"}>
+        <ProtectedPage permission="manage:notifications"><BulkNotifications /></ProtectedPage>
+      </Route>
+
+      <Route path={"/custom-domains"}>
+        <ProtectedPage permission="manage:tenants"><CustomDomains /></ProtectedPage>
+      </Route>
+
+      <Route path={"/data-export"}>
+        <ProtectedPage permission="manage:exports"><DataExport /></ProtectedPage>
+      </Route>
+
+      <Route path={"/rbac"}>
+        <ProtectedPage permission="manage:rbac"><RBACEditor /></ProtectedPage>
+      </Route>
+
+      <Route path={"/webhooks"}>
+        <ProtectedPage permission="manage:tenants"><WebhookManager /></ProtectedPage>
+      </Route>
+
+      <Route path={"/platform-config"}>
+        <ProtectedPage permission="manage:settings"><PlatformConfig /></ProtectedPage>
+      </Route>
+
+      <Route path={"/inactive-tenants"}>
+        <ProtectedPage permission="manage:tenants"><InactiveTenants /></ProtectedPage>
+      </Route>
+
+      <Route path={"/impersonation"}>
+        <ProtectedPage permission="manage:tenants"><TenantImpersonation /></ProtectedPage>
       </Route>
 
       {/* 404 */}

@@ -369,6 +369,187 @@ export class ApiClient {
     return this.delete(`/feature-flags/${tenantId}`)
   }
 
+  // ── AI Usage ──────────────────────────────────────────────────────────────
+
+  async getAIUsage(period = '30d') {
+    return this.get(`/ai/usage?period=${period}`)
+  }
+
+  // ── Fraud Alerts ──────────────────────────────────────────────────────────
+
+  async getFraudAlerts(status?: string, severity?: string) {
+    const params = new URLSearchParams()
+    if (status && status !== 'all') params.set('status', status)
+    if (severity && severity !== 'all') params.set('severity', severity)
+    return this.get(`/fraud/alerts?${params.toString()}`)
+  }
+
+  async dismissFraudAlert(id: string) {
+    return this.post(`/fraud/alerts/${id}/dismiss`, {})
+  }
+
+  async resolveFraudAlert(id: string) {
+    return this.post(`/fraud/alerts/${id}/resolve`, {})
+  }
+
+  // ── KYC ───────────────────────────────────────────────────────────────────
+
+  async getKYCQueue(status?: string) {
+    const params = new URLSearchParams()
+    if (status && status !== 'all') params.set('status', status)
+    return this.get(`/kyc/queue?${params.toString()}`)
+  }
+
+  async approveKYC(id: string) {
+    return this.post(`/kyc/${id}/approve`, {})
+  }
+
+  async rejectKYC(id: string, reason: string) {
+    return this.post(`/kyc/${id}/reject`, { reason })
+  }
+
+  // ── Billing Plans ─────────────────────────────────────────────────────────
+
+  async getBillingPlans() {
+    return this.get('/billing/plans')
+  }
+
+  async createBillingPlan(data: unknown) {
+    return this.post('/billing/plans', data)
+  }
+
+  async updateBillingPlan(id: string, data: unknown) {
+    return this.put(`/billing/plans/${id}`, data)
+  }
+
+  async deleteBillingPlan(id: string) {
+    return this.delete(`/billing/plans/${id}`)
+  }
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+
+  async getNotificationHistory() {
+    return this.get('/notifications/history')
+  }
+
+  async sendBulkNotification(data: unknown) {
+    return this.post('/notifications/bulk', data)
+  }
+
+  // ── Custom Domains ────────────────────────────────────────────────────────
+
+  async getCustomDomains(status?: string) {
+    const params = new URLSearchParams()
+    if (status && status !== 'all') params.set('status', status)
+    return this.get(`/domains?${params.toString()}`)
+  }
+
+  async approveDomain(id: string) {
+    return this.post(`/domains/${id}/approve`, {})
+  }
+
+  async rejectDomain(id: string, reason?: string) {
+    return this.post(`/domains/${id}/reject`, { reason })
+  }
+
+  async verifyDomain(id: string) {
+    return this.post(`/domains/${id}/verify`, {})
+  }
+
+  // ── Data Exports ──────────────────────────────────────────────────────────
+
+  async getExports() {
+    return this.get('/exports')
+  }
+
+  async createExport(data: unknown) {
+    return this.post('/exports', data)
+  }
+
+  // ── RBAC ──────────────────────────────────────────────────────────────────
+
+  async getRoles() {
+    return this.get('/rbac/roles')
+  }
+
+  async createRole(data: unknown) {
+    return this.post('/rbac/roles', data)
+  }
+
+  async updateRole(id: string, data: unknown) {
+    return this.put(`/rbac/roles/${id}`, data)
+  }
+
+  async deleteRole(id: string) {
+    return this.delete(`/rbac/roles/${id}`)
+  }
+
+  // ── Webhooks ──────────────────────────────────────────────────────────────
+
+  async getWebhooks(status?: string) {
+    const params = new URLSearchParams()
+    if (status && status !== 'all') params.set('status', status)
+    return this.get(`/webhooks?${params.toString()}`)
+  }
+
+  async getWebhookDeliveries(webhookId: string) {
+    return this.get(`/webhooks/${webhookId}/deliveries`)
+  }
+
+  async retryWebhookDelivery(deliveryId: string) {
+    return this.post(`/webhooks/deliveries/${deliveryId}/retry`, {})
+  }
+
+  async deleteWebhook(id: string) {
+    return this.delete(`/webhooks/${id}`)
+  }
+
+  // ── Platform Config ───────────────────────────────────────────────────────
+
+  async getPlatformConfig() {
+    return this.get('/platform/config')
+  }
+
+  async updatePlatformConfig(data: unknown) {
+    return this.put('/platform/config', data)
+  }
+
+  // ── Inactive Tenants ──────────────────────────────────────────────────────
+
+  async getInactiveTenants(days = 90) {
+    return this.get(`/tenants/inactive?days=${days}`)
+  }
+
+  async bulkArchiveTenants(ids: string[]) {
+    return this.post('/tenants/bulk-archive', { ids })
+  }
+
+  async bulkNotifyInactiveTenants(ids: string[]) {
+    return this.post('/tenants/bulk-notify-inactive', { ids })
+  }
+
+  // ── Tenant Impersonation ──────────────────────────────────────────────────
+
+  async impersonateTenant(tenantId: string, reason: string) {
+    return this.post(`/tenants/${tenantId}/impersonate`, { reason })
+  }
+
+  async getImpersonationLogs() {
+    return this.get('/tenants/impersonation/logs')
+  }
+
+  // ── Tenant Provisioning ───────────────────────────────────────────────────
+
+  async provisionTenant(data: unknown) {
+    return this.post('/tenants/provision', data)
+  }
+
+  // ── Tenant Suspension ─────────────────────────────────────────────────────
+
+  async suspendTenant(tenantId: string) {
+    return this.post(`/tenants/${tenantId}/suspend`, {})
+  }
+
   // ── WebSocket ─────────────────────────────────────────────────────────────
   // The browser automatically includes the HttpOnly auth cookie on WebSocket
   // connections to the same domain — no token parameter needed.

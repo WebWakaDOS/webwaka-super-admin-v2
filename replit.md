@@ -19,6 +19,49 @@ The backend is designed to run on Cloudflare Workers (D1 + KV) — the workers p
 - **Forms**: React Hook Form + Zod
 - **State**: React Context (AuthContext, TenantContext, ThemeContext)
 
+## Pages & Features (20 Implementations)
+
+### Core
+- **Dashboard** `/` — Overview metrics
+- **Analytics** `/analytics` — Revenue and usage charts
+- **System Health** `/health` — Service status monitoring
+
+### Tenant Management
+- **Tenants** `/tenants` — CRUD with virtual scroll + bulk ops
+- **Onboarding Wizard** `/onboarding` — 4-step guided tenant provisioning
+- **Tenant Impersonation** `/impersonation` — Secure admin-as-tenant sessions with audit log
+- **Inactive Tenants** `/inactive-tenants` — Pruner with bulk archive/notify
+
+### Security & Compliance
+- **Fraud Alerts** `/fraud-alerts` — Resolution center with severity-based triage
+- **KYC Queue** `/kyc-queue` — Manual identity verification review
+- **RBAC Editor** `/rbac` — Role and permission management
+- **Audit Log** `/audit-log` — Platform-wide action history
+
+### Billing
+- **Billing** `/billing` — Revenue records
+- **Subscription Plans** `/subscription-plans` — Plan CRUD with feature management
+
+### AI & Intelligence
+- **AI Usage** `/ai-usage` — Token consumption dashboard by tenant and model
+
+### Platform Ops
+- **Modules** `/modules` — Feature flag and module registry
+- **Feature Flags** `/feature-flags` — Per-tenant flag overrides
+- **Custom Domains** `/custom-domains` — Domain request approval and SSL tracking
+- **Webhooks** `/webhooks` — Endpoint management and delivery log replay
+- **Platform Config** `/platform-config` — Global settings editor
+- **Bulk Notifications** `/bulk-notifications` — Email/SMS campaigns
+- **Data Export** `/data-export` — CSV/XLSX/JSON export utility
+- **Deployments** `/deployments` — Release management
+- **Partners** `/partners` — Partner ecosystem
+- **Builder Admin** `/builder-admin` — UI builder administration
+
+### Mobile Responsive Layout (#20)
+- Sidebar collapses to a slide-over on mobile with dark overlay
+- Hamburger icon added to Header for mobile toggle
+- Sidebar nav organized into collapsible sections
+
 ## Key Files
 
 - `frontend/src/App.tsx` — Main router and app shell
