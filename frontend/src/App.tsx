@@ -139,7 +139,7 @@ function AppRouter() {
 
       {/* Phase 6 — 20 Backlog Enhancements */}
       <Route path={"/ai-usage"}>
-        <ProtectedPage><AIUsage /></ProtectedPage>
+        <ProtectedPage permission="view:billing"><AIUsage /></ProtectedPage>
       </Route>
 
       <Route path={"/fraud-alerts"}>

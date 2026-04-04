@@ -98,6 +98,30 @@ Configured as a static site deployment:
 - `/operations` — Operations Overview
 - `/deployments` — Deployment Manager
 - `/audit-log` — Audit Log
+- `/ai-usage` — AI Usage Dashboard (requires `view:billing`)
+- `/fraud-alerts` — Fraud Alert Resolution Center (requires `manage:security`)
+- `/onboarding` — Automated Onboarding Wizard
+- `/kyc-queue` — KYC Document Queue
+- `/subscription-plans` — Subscription Plans Manager
+- `/bulk-notifications` — Bulk Notification Center
+- `/custom-domains` — Custom Domain Manager
+- `/data-export` — Data Export Center
+- `/rbac` — RBAC Role Editor
+- `/webhooks` — Webhook Manager
+- `/platform-config` — Platform Configuration
+- `/inactive-tenants` — Inactive Tenant Monitor
+- `/impersonation` — Tenant Impersonation
+
+## Testing
+
+- **Framework**: Vitest + @testing-library/react + jsdom
+- **Config**: `frontend/vitest.config.ts` (jsdom environment, setupFiles: `src/test-setup.ts`)
+- **Setup file**: `frontend/src/test-setup.ts` — Pointer Events polyfill (Radix UI), Recharts stub
+- **Run**: `cd frontend && pnpm test`
+- **QA-certified tests** (`SUP_QA_CERTIFICATION_1775282239137.md`):
+  - `AIUsage.test.tsx` — 20 tests, all passing (QA-SUP-1)
+  - `FraudAlerts.test.tsx` — 21 tests, all passing (QA-SUP-2)
+  - `OnboardingWizard.test.tsx` — 18 tests, all passing (QA-SUP-3)
 
 ## Security
 
