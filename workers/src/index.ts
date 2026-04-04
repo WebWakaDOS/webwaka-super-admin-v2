@@ -158,7 +158,7 @@ const PartnerCreateSchema = z.object({
   company: z.string().optional(),
   tier: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
   commission_rate_percent: z.number().min(0).max(100).optional(),
-  ndpr_consent: z.literal(true, { error: 'NDPR consent is required (Nigeria First invariant)' }),
+  ndpr_consent: z.literal(true, { message: 'NDPR consent is required (Nigeria First invariant)' }),
   monthly_fee_kobo: z.number().int().optional(),
   notes: z.string().optional(),
 })
@@ -178,7 +178,7 @@ const PartnerUpdateSchema = z.object({
 const PartnerSuiteSchema = z.object({
   suite: z.string().min(1, 'suite is required'),
   action: z.enum(['assign', 'revoke', 'suspend'], {
-    error: 'action must be assign, revoke, or suspend',
+    message: 'action must be assign, revoke, or suspend',
   }),
 })
 
@@ -215,7 +215,7 @@ const AIQuotaUpdateSchema = z.object({
 
 const AIQuotaResetSchema = z.object({
   resetType: z.enum(['daily', 'monthly'], {
-    error: 'resetType must be daily or monthly',
+    message: 'resetType must be daily or monthly',
   }),
 })
 
@@ -260,7 +260,7 @@ const SettingsUpdateSchema = z.object({
 const HealthAlertSchema = z.object({
   alert_type: z.string().min(1, 'alert_type is required'),
   severity: z.enum(['INFO', 'WARNING', 'CRITICAL'], {
-    error: 'severity must be INFO, WARNING, or CRITICAL',
+    message: 'severity must be INFO, WARNING, or CRITICAL',
   }),
   message: z.string().min(1, 'message is required'),
 })

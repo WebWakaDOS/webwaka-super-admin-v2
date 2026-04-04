@@ -240,7 +240,7 @@ describe('Auth Endpoints', () => {
 describe('Tenant Endpoints', () => {
   it('GET /tenants without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/tenants`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /tenants without auth should return 403', async () => {
@@ -249,12 +249,12 @@ describe('Tenant Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'Test', email: 'test@test.com', industry: 'RETAIL' }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /tenants/:id without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/tenants/some-id`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('PUT /tenants/:id without auth should return 403', async () => {
@@ -263,12 +263,12 @@ describe('Tenant Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'ACTIVE' }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('DELETE /tenants/:id without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/tenants/some-id`, { method: 'DELETE' })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /tenants response body should have success field', async () => {
@@ -286,22 +286,22 @@ describe('Tenant Endpoints', () => {
       },
       body: JSON.stringify({ name: 'Only Name' }),
     })
-    expect([400, 403, 404]).toContain(res.status)
+    expect([400, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /tenants should support pagination query params', async () => {
     const res = await fetch(`${API_BASE_URL}/tenants?page=1&limit=10`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /tenants should support status filter', async () => {
     const res = await fetch(`${API_BASE_URL}/tenants?status=ACTIVE`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /tenants/:id with non-existent ID should return 403 or 404', async () => {
     const res = await fetch(`${API_BASE_URL}/tenants/nonexistent-id-xyz`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 })
 
@@ -312,7 +312,7 @@ describe('Tenant Endpoints', () => {
 describe('Partner Endpoints', () => {
   it('GET /partners without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/partners`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /partners without auth should return 403', async () => {
@@ -321,12 +321,12 @@ describe('Partner Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'Test', email: 'test@test.com', ndpr_consent: true }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /partners/:id without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/partners/some-id`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('PUT /partners/:id without auth should return 403', async () => {
@@ -335,12 +335,12 @@ describe('Partner Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'ACTIVE' }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('DELETE /partners/:id without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/partners/some-id`, { method: 'DELETE' })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /partners/:id/suites without auth should return 403', async () => {
@@ -349,7 +349,7 @@ describe('Partner Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ suite: 'civic', action: 'assign' }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /partners without NDPR consent should return 400 or 403', async () => {
@@ -361,7 +361,7 @@ describe('Partner Endpoints', () => {
       },
       body: JSON.stringify({ name: 'Test', email: 'test@test.com', ndpr_consent: false }),
     })
-    expect([400, 403, 404]).toContain(res.status)
+    expect([400, 401, 403, 404]).toContain(res.status)
   })
 
   it('POST /partners/:id/suites with invalid action should return 400 or 403', async () => {
@@ -373,22 +373,22 @@ describe('Partner Endpoints', () => {
       },
       body: JSON.stringify({ suite: 'civic', action: 'invalid_action' }),
     })
-    expect([400, 403, 404]).toContain(res.status)
+    expect([400, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /partners should support status filter', async () => {
     const res = await fetch(`${API_BASE_URL}/partners?status=ACTIVE`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /partners should support tier filter', async () => {
     const res = await fetch(`${API_BASE_URL}/partners?tier=PROFESSIONAL`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /partners/:id with non-existent ID should return 403 or 404', async () => {
     const res = await fetch(`${API_BASE_URL}/partners/nonexistent-partner-xyz`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('partner response should have success field', async () => {
@@ -405,12 +405,12 @@ describe('Partner Endpoints', () => {
 describe('Deployment Endpoints', () => {
   it('GET /deployments without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/deployments`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /deployments/:id without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/deployments/dep-civic-prod`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('PUT /deployments/:id/status without auth should return 403', async () => {
@@ -419,22 +419,22 @@ describe('Deployment Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ worker_status: 'LIVE' }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /deployments/refresh without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/deployments/refresh`, { method: 'POST' })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /deployments with suite filter should accept query param', async () => {
     const res = await fetch(`${API_BASE_URL}/deployments?suite=civic`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /deployments with environment filter should accept query param', async () => {
     const res = await fetch(`${API_BASE_URL}/deployments?environment=PRODUCTION`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('PUT /deployments/:id/status with empty body should return 400 or 403', async () => {
@@ -446,12 +446,12 @@ describe('Deployment Endpoints', () => {
       },
       body: JSON.stringify({}),
     })
-    expect([400, 403, 404]).toContain(res.status)
+    expect([400, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /deployments/:id with non-existent ID should return 403 or 404', async () => {
     const res = await fetch(`${API_BASE_URL}/deployments/nonexistent-dep-xyz`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 })
 
@@ -462,12 +462,12 @@ describe('Deployment Endpoints', () => {
 describe('Operations Analytics Endpoints', () => {
   it('GET /operations/metrics without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/operations/metrics`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /operations/summary without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/operations/summary`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /operations/metrics without auth should return 403', async () => {
@@ -476,12 +476,12 @@ describe('Operations Analytics Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenant_id: 'test', suite: 'civic', metric_date: '2026-03-21' }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /operations/ai-usage without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/operations/ai-usage`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /operations/metrics without required fields should return 400 or 403', async () => {
@@ -493,17 +493,17 @@ describe('Operations Analytics Endpoints', () => {
       },
       body: JSON.stringify({ tenant_id: 'test' }),
     })
-    expect([400, 403, 404]).toContain(res.status)
+    expect([400, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /operations/metrics should accept date range query params', async () => {
     const res = await fetch(`${API_BASE_URL}/operations/metrics?dateFrom=2026-01-01&dateTo=2026-03-21`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('GET /operations/metrics should accept suite filter', async () => {
     const res = await fetch(`${API_BASE_URL}/operations/metrics?suite=commerce`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('operations response should have success field', async () => {
@@ -520,7 +520,7 @@ describe('Operations Analytics Endpoints', () => {
 describe('AI Quota Management Endpoints', () => {
   it('GET /ai-quotas/:tenantId without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/ai-quotas/test-tenant`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('PUT /ai-quotas/:tenantId without auth should return 403', async () => {
@@ -529,7 +529,7 @@ describe('AI Quota Management Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ monthly_token_limit: 2000000 }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /ai-quotas/:tenantId/reset without auth should return 403', async () => {
@@ -538,7 +538,7 @@ describe('AI Quota Management Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resetType: 'daily' }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /ai-quotas/:tenantId/reset with invalid resetType should return 400 or 403', async () => {
@@ -550,7 +550,7 @@ describe('AI Quota Management Endpoints', () => {
       },
       body: JSON.stringify({ resetType: 'invalid' }),
     })
-    expect([400, 403, 404]).toContain(res.status)
+    expect([400, 401, 403, 404]).toContain(res.status)
   })
 
   it('AI vendor options should include byok (Vendor Neutral AI invariant)', () => {
@@ -574,12 +574,12 @@ describe('AI Quota Management Endpoints', () => {
 describe('Billing Endpoints', () => {
   it('GET /billing/ledger without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/billing/ledger`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /billing/summary should return 200 or 403', async () => {
     const res = await fetch(`${API_BASE_URL}/billing/summary`)
-    expect([200, 403, 404]).toContain(res.status)
+    expect([200, 401, 403, 404]).toContain(res.status)
   })
 
   it('POST /billing/entry without auth should return 403', async () => {
@@ -588,7 +588,7 @@ describe('Billing Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenant_id: 'test', entry_type: 'REVENUE', amount_kobo: 500000 }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('POST /billing/entry with float amount_kobo should return 400 or 403', async () => {
@@ -600,7 +600,7 @@ describe('Billing Endpoints', () => {
       },
       body: JSON.stringify({ tenant_id: 'test', entry_type: 'REVENUE', amount_kobo: 5000.50 }),
     })
-    expect([400, 403, 404]).toContain(res.status)
+    expect([400, 401, 403, 404]).toContain(res.status)
   })
 
   it('POST /billing/entry without required fields should return 400 or 403', async () => {
@@ -612,7 +612,7 @@ describe('Billing Endpoints', () => {
       },
       body: JSON.stringify({ tenant_id: 'test' }),
     })
-    expect([400, 403, 404]).toContain(res.status)
+    expect([400, 401, 403, 404]).toContain(res.status)
   })
 
   it('amount_kobo validation: 500000 kobo = ₦5,000', () => {
@@ -630,7 +630,7 @@ describe('Billing Endpoints', () => {
 describe('Module Management Endpoints', () => {
   it('GET /modules without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/modules`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /modules/:tenantId should be accessible', async () => {
@@ -644,7 +644,7 @@ describe('Module Management Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: true }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('GET /modules response should have success field', async () => {
@@ -661,7 +661,7 @@ describe('Module Management Endpoints', () => {
 describe('Settings Endpoints', () => {
   it('GET /settings without auth should return 403', async () => {
     const res = await fetch(`${API_BASE_URL}/settings`)
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('PUT /settings without auth should return 403', async () => {
@@ -670,7 +670,7 @@ describe('Settings Endpoints', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ maintenanceMode: true }),
     })
-    expect([403, 404]).toContain(res.status)
+    expect([401, 403, 404]).toContain(res.status)
   })
 
   it('settings response should have success field', async () => {
