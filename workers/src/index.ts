@@ -328,7 +328,9 @@ async function verifyJWT(token: string, secret: string): Promise<any | null> {
     )
     const valid = await crypto.subtle.verify('HMAC', key, sig, data)
     if (!valid) return null
-    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
+    const payloadDecoded = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'))
+    const payloadBytes2 = Uint8Array.from(payloadDecoded, (ch) => ch.charCodeAt(0))
+    const payload = JSON.parse(new TextDecoder().decode(payloadBytes2))
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null
     return payload
   } catch {
@@ -344,7 +346,9 @@ async function signJWT(
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const now = Math.floor(Date.now() / 1000)
-  const fullPayload = btoa(JSON.stringify({ ...payload, iat: now, exp: now + expiresInSeconds }))
+  const payloadJson = JSON.stringify({ ...payload, iat: now, exp: now + expiresInSeconds })
+  const payloadBytes = new TextEncoder().encode(payloadJson)
+  const fullPayload = btoa(String.fromCharCode(...payloadBytes))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const enc = new TextEncoder()
   const key = await crypto.subtle.importKey(
