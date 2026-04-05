@@ -32,3 +32,9 @@ yarn-error.log*
 .cache/
 .turbo/
 .wrangler/
+# Local secrets — never commit
+.dev.vars
+
+# Test coverage artifacts — never commit
+coverage/
+*.lcov
