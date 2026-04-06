@@ -302,9 +302,11 @@ function apiResponse(success: boolean, data?: any, errors?: string[]) {
 
 function generateId(prefix: string): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  const bytes = new Uint8Array(12)
+  crypto.getRandomValues(bytes)
   let id = prefix + '-'
   for (let i = 0; i < 12; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)]
+    id += chars[bytes[i] % chars.length]
   }
   return id
 }
@@ -2504,7 +2506,7 @@ app.onError(async (err, c) => {
     try {
       const db = (c.env as any).HEALTH_DB
       if (db) {
-        const alertId = `alert_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        const alertId = generateId('alert')
         await db.prepare(
           `INSERT OR IGNORE INTO alerts (id, service, severity, message, resolved, created_at)
            VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)`

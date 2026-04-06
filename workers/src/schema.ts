@@ -179,9 +179,11 @@ export function formatKoboToNaira(kobo: number): string {
  */
 export function generateId(prefix: string): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  const bytes = new Uint8Array(12)
+  crypto.getRandomValues(bytes)
   let id = prefix + '-'
   for (let i = 0; i < 12; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)]
+    id += chars[bytes[i] % chars.length]
   }
   return id
 }
