@@ -46,7 +46,7 @@ jobs:
 
       - name: Run type checking
         working-directory: workers
-        run: pnpm type-check || true
+        run: pnpm type-check
 
       - name: Run tests
         working-directory: workers
