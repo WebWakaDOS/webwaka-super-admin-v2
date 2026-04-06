@@ -457,7 +457,9 @@ async function signJWT(
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const now = Math.floor(Date.now() / 1000)
-  const payloadJson = JSON.stringify({ ...payload, iat: now, exp: now + expiresInSeconds })
+  // T-08: embed jti (JWT ID) so tokens can be individually revoked
+  const jti = (() => { const b = new Uint8Array(16); crypto.getRandomValues(b); return Array.from(b).map(x => x.toString(16).padStart(2,'0')).join('') })()
+  const payloadJson = JSON.stringify({ ...payload, iat: now, exp: now + expiresInSeconds, jti })
   const payloadBytes = new TextEncoder().encode(payloadJson)
   const fullPayload = btoa(String.fromCharCode(...payloadBytes))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
@@ -469,6 +471,27 @@ async function signJWT(
   const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuffer)))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   return `${header}.${fullPayload}.${sig}`
+}
+
+
+// ============================================================================
+// JWT JTI BLOCKLIST (T-08) — stored in SESSIONS_KV
+// ============================================================================
+
+/**
+ * Add a jti to the blocklist. TTL is set to the token's remaining lifetime.
+ */
+async function blockJTI(kv: KVNamespace, jti: string, exp: number): Promise<void> {
+  const ttl = Math.max(exp - Math.floor(Date.now() / 1000), 1)
+  await kv.put(`blocklist:jti:${jti}`, '1', { expirationTtl: ttl })
+}
+
+/**
+ * Check if a jti is blocked. Returns true if the token is revoked.
+ */
+async function isJTIBlocked(kv: KVNamespace, jti: string): Promise<boolean> {
+  const val = await kv.get(`blocklist:jti:${jti}`)
+  return val !== null
 }
 
 // Parse the auth_token value from a raw Cookie header string.
@@ -534,6 +557,11 @@ async function requirePermission(c: any, permission: string): Promise<void> {
 async function requireAuth(c: any): Promise<any> {
   const payload = await getAuthPayload(c)
   if (!payload) throw new HTTPException(401, { message: 'Unauthorized' })
+  // T-08: Check JTI blocklist (tokens explicitly revoked at logout)
+  if (payload.jti && c.env?.SESSIONS_KV) {
+    const blocked = await isJTIBlocked(c.env.SESSIONS_KV, payload.jti)
+    if (blocked) throw new HTTPException(401, { message: 'Token has been revoked. Please log in again.' })
+  }
   return payload
 }
 async function getTenantId(c: any): Promise<string> {
@@ -707,9 +735,17 @@ app.post('/auth/refresh', async (c) => {
 
 /**
  * POST /auth/logout
- * Clears the HttpOnly auth cookie. Server-side blocklist can be added later via jti.
+ * Clears the HttpOnly auth cookie and adds the jti to the SESSIONS_KV blocklist.
  */
 app.post('/auth/logout', async (c) => {
+  try {
+    const payload = await getAuthPayload(c)
+    if (payload?.jti && payload?.exp && c.env?.SESSIONS_KV) {
+      await blockJTI(c.env.SESSIONS_KV, payload.jti, payload.exp)
+    }
+  } catch {
+    // Best-effort — always clear the cookie even if blocklist write fails
+  }
   c.header('Set-Cookie', buildClearCookieStr(c.env.ENVIRONMENT || 'development'))
   return c.json(apiResponse(true, { message: 'Logged out successfully' }))
 })
