@@ -23,7 +23,6 @@
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 import { HTTPException } from 'hono/http-exception'
-import bcrypt from 'bcryptjs'
 import type { Context as HonoContext } from 'hono'
 import { hashPassword, verifyPassword } from './auth/password'
 import { z } from 'zod'
