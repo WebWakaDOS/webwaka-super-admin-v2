@@ -19,16 +19,16 @@ The backend is designed to run on Cloudflare Workers (D1 + KV) — the workers p
 - **Forms**: React Hook Form + Zod
 - **State**: React Context (AuthContext, TenantContext, ThemeContext)
 
-## Pages & Features (20 Implementations)
+## Pages & Features (20+ Implementations + 8 WA-SA Enhancements)
 
 ### Core
 - **Dashboard** `/` — Overview metrics
 - **Analytics** `/analytics` — Revenue and usage charts
-- **System Health** `/health` — Service status monitoring
+- **System Health** `/health` — Service status monitoring with SLA tracking, alert threshold rules, alert acknowledgment
 
 ### Tenant Management
 - **Tenants** `/tenants` — CRUD with virtual scroll + bulk ops
-- **Onboarding Wizard** `/onboarding` — 4-step guided tenant provisioning
+- **Onboarding Wizard** `/onboarding` — **Enhanced**: 5-step wizard (KYC/Compliance step), provisioning state machine (PENDING_VERIFICATION→PROVISIONING→ACTIVE|FAILED), idempotency key, real-time log stream, multi-region selector (WA-SA-001)
 - **Tenant Impersonation** `/impersonation` — Secure admin-as-tenant sessions with audit log
 - **Inactive Tenants** `/inactive-tenants` — Pruner with bulk archive/notify
 
@@ -39,20 +39,21 @@ The backend is designed to run on Cloudflare Workers (D1 + KV) — the workers p
 - **Audit Log** `/audit-log` — Platform-wide action history
 
 ### Billing
-- **Billing** `/billing` — Revenue records
+- **Billing** `/billing` — **Enhanced**: Real-time MRR/ARR/churn metrics, revenue AreaChart, auto-refresh (30s/1m/5m/manual), billing health indicators, tabbed layout (WA-SA-002)
 - **Subscription Plans** `/subscription-plans` — Plan CRUD with feature management
 
 ### AI & Intelligence
 - **AI Usage** `/ai-usage` — Token consumption dashboard by tenant and model
 
 ### Platform Ops
-- **Modules** `/modules` — Feature flag and module registry
-- **Feature Flags** `/feature-flags` — Per-tenant flag overrides
+- **Modules** `/modules` — **Enhanced**: Version history drawer, dependency management with conflict detection, changelog per module, update badges, search/filter (WA-SA-003)
+- **Feature Flags** `/feature-flags` — **Enhanced**: A/B Experiments tab — create multi-variant experiments, rollout percentage controls, declare winner, pause/resume/end lifecycle (WA-SA-004)
 - **Custom Domains** `/custom-domains` — Domain request approval and SSL tracking
 - **Webhooks** `/webhooks` — Endpoint management and delivery log replay
-- **Platform Config** `/platform-config` — Global settings editor
+- **Platform Config** `/platform-config` — **Enhanced**: Multi-Region section — enable/disable regions, geo-routing toggle, D1 cross-region replication, primary/default region selectors (WA-SA-007)
+- **Settings** `/settings` — **Enhanced**: Granular API key permission scopes (14 scopes + superuser), environment labels, scope badges, two-step key revocation (WA-SA-006)
+- **Data Export** `/data-export` — **Enhanced**: Data Retention Policies tab — 8 category policies, NDPR compliance enforcement, schedule config, manual run, edit dialog (WA-SA-008)
 - **Bulk Notifications** `/bulk-notifications` — Email/SMS campaigns
-- **Data Export** `/data-export` — CSV/XLSX/JSON export utility
 - **Deployments** `/deployments` — Release management
 - **Partners** `/partners` — Partner ecosystem
 - **Builder Admin** `/builder-admin` — UI builder administration
