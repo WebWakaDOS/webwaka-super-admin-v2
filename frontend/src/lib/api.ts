@@ -1,12 +1,8 @@
 // API client for Hono Workers backend
-// Evaluate API base at runtime to ensure correct endpoint is used
+// Use /api relative path so Vite's dev proxy forwards to the backend worker.
+// This works on any host (localhost, Replit, staging, etc.).
 function getAPIBase() {
-  if (typeof window === 'undefined') {
-    return 'https://webwaka-super-admin-api.webwaka.workers.dev'
-  }
-  const isLocalhost =
-    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  return isLocalhost ? 'http://localhost:8787' : 'https://webwaka-super-admin-api.webwaka.workers.dev'
+  return '/api'
 }
 
 // ── Shared response types ────────────────────────────────────────────────────
