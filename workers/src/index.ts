@@ -1027,9 +1027,15 @@ app.get('/partners', async (c) => {
     params.push(limit, offset)
 
     const result = await c.env.TENANTS_DB.prepare(query).bind(...params).all()
-    const countResult = await c.env.TENANTS_DB.prepare(
-      `SELECT COUNT(*) as total FROM partners`
-    ).first()
+
+    // Build filtered count query (mirrors the WHERE clause above, minus LIMIT/OFFSET)
+    let countQuery = `SELECT COUNT(*) as total FROM partners WHERE 1=1`
+    const countParams: any[] = []
+    if (status) { countQuery += ` AND status = ?`; countParams.push(status) }
+    if (tier) { countQuery += ` AND tier = ?`; countParams.push(tier) }
+    const countResult = countParams.length
+      ? await c.env.TENANTS_DB.prepare(countQuery).bind(...countParams).first()
+      : await c.env.TENANTS_DB.prepare(countQuery).first()
 
     return c.json(
       apiResponse(true, {
