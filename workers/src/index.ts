@@ -2043,41 +2043,47 @@ app.put('/modules/:tenantId/:moduleId', async (c) => {
 // SETTINGS ENDPOINTS
 // ============================================================================
 
+const PLATFORM_SETTINGS_DEFAULTS = {
+  apiRateLimit: 1000,
+  sessionTimeout: 3600,
+  maintenanceMode: false,
+  maxTenantCount: 10000,
+  coreInvariants: [
+    'Build Once Use Infinitely',
+    'Mobile First',
+    'PWA First',
+    'Offline First',
+    'Nigeria First',
+    'Africa First',
+    'Vendor Neutral AI',
+  ],
+  version: '2.0.0',
+}
+
 app.get('/settings', async (c) => {
   try {
     await requirePermission(c, 'read:settings')
 
-    return c.json(
-      apiResponse(true, {
-        apiRateLimit: 1000,
-        sessionTimeout: 3600,
-        maintenanceMode: false,
-        maxTenantCount: 10000,
-        coreInvariants: [
-          'Build Once Use Infinitely',
-          'Mobile First',
-          'PWA First',
-          'Offline First',
-          'Nigeria First',
-          'Africa First',
-          'Vendor Neutral AI',
-        ],
-        version: '2.0.0',
-      })
-    )
+    const stored = await c.env.FEATURE_FLAGS_KV.get('platform:settings', 'json') as Record<string, unknown> | null
+    const settings = { ...PLATFORM_SETTINGS_DEFAULTS, ...(stored || {}) }
+    return c.json(apiResponse(true, settings))
   } catch (err) {
     if (err instanceof HTTPException) throw err
     throw new HTTPException(500, { message: 'Internal server error' })
   }
 })
 
+
 app.put('/settings', async (c) => {
   try {
-    await requirePermission(c, 'write:tenants')
+    await requirePermission(c, 'manage:settings')  // T-05: was incorrectly 'write:tenants'
 
     const body = parseBody(SettingsUpdateSchema, await c.req.json())
-    await c.env.FEATURE_FLAGS_KV.put('platform:settings', JSON.stringify({ ...body, updatedAt: Date.now() }))
-    return c.json(apiResponse(true, { updated: true, settings: body }))
+    // Merge with existing persisted settings (preserve unspecified fields)
+    const existing = await c.env.FEATURE_FLAGS_KV.get('platform:settings', 'json') as Record<string, unknown> | null
+    const merged = { ...PLATFORM_SETTINGS_DEFAULTS, ...(existing || {}), ...body, updatedAt: Date.now() }
+    await c.env.FEATURE_FLAGS_KV.put('platform:settings', JSON.stringify(merged))
+    return c.json(apiResponse(true, { updated: true, settings: merged }))
   } catch (err) {
     if (err instanceof HTTPException) throw err
     throw new HTTPException(500, { message: 'Internal server error' })
