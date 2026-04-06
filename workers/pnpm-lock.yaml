@@ -8,10 +8,22 @@ importers:
 
   .:
     dependencies:
+      '@webwaka/core':
+        specifier: ^1.6.1
+        version: 1.6.1
+      bcryptjs:
+        specifier: ^2.4.3
+        version: 2.4.3
       hono:
         specifier: ^4.0.0
         version: 4.12.8
+      zod:
+        specifier: ^3.22.0
+        version: 3.22.3
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260317.1
+        version: 4.20260317.1
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.37
@@ -32,6 +44,21 @@ importers:
         version: 3.114.17
 
 packages:
+
+  '@cloudflare/workers-types@4.20260317.1':
+    resolution: {integrity: sha512-+G4eVwyCpm8Au1ex8vQBCuA9wnwqetz4tPNRoB/53qvktERWBRMQnrtvC1k584yRE3emMThtuY0gWshvSJ++PQ==}
+
+  '@webwaka/core@1.6.1':
+    resolution: {integrity: sha512-udl3p6zRsgbstkw3YgCtaoGZ7xlXUL2WLtaVMT2u7eOiZYT1fEK4Msvf6d9LUnF+YMydAcw2XA0jT4RDO6NCYw==}
+    peerDependencies:
+      dexie: '>=4.0.0'
+      hono: '>=4.0.0'
+    peerDependenciesMeta:
+      dexie:
+        optional: true
+
+  bcryptjs@2.4.3:
+    resolution: {integrity: sha512-V/Hy/X9Vt7f3BbPJEi8BdVFMByHi+jNXrYkW3huaybV/kQ0KJg0Y6PkEMbn+zeT+i+SiKZ/HMqJGIIt4LZDqNQ==}
 
   '@cloudflare/kv-asset-handler@0.3.4':
     resolution: {integrity: sha512-YLPHc8yASwjNkmcDMQMY35yiWjoKAKnhUbPRszBRS0YgH+IXtsMp61j+yTcnCE3oO2DgP0U3iejLC8FTtKDC8Q==}
@@ -2890,5 +2917,11 @@ snapshots:
       cookie: 0.7.2
       mustache: 4.2.0
       stacktracey: 2.2.0
+
+  '@cloudflare/workers-types@4.20260317.1': {}
+
+  '@webwaka/core@1.6.1': {}
+
+  bcryptjs@2.4.3: {}
 
   zod@3.22.3: {}
