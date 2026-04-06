@@ -1889,7 +1889,8 @@ app.get('/billing/summary', async (c) => {
     const cached = await c.env.CACHE_KV.get(cacheKey)
     if (cached) return c.json(apiResponse(true, JSON.parse(cached)))
 
-    const result = await c.env.BILLING_DB.prepare(
+    // All-time totals
+    const allTime = await c.env.BILLING_DB.prepare(
       `SELECT
         SUM(CASE WHEN entry_type = 'REVENUE' THEN amount_kobo ELSE 0 END) as total_revenue,
         SUM(CASE WHEN entry_type = 'COMMISSION' THEN amount_kobo ELSE 0 END) as total_commissions,
@@ -1899,10 +1900,33 @@ app.get('/billing/summary', async (c) => {
       .bind(tenantId)
       .first()
 
+    // MTD: current calendar month
+    const mtdResult = await c.env.BILLING_DB.prepare(
+      `SELECT SUM(CASE WHEN entry_type = 'REVENUE' THEN amount_kobo ELSE 0 END) as revenue
+       FROM ledger_entries
+       WHERE tenant_id = ?
+         AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')`
+    )
+      .bind(tenantId)
+      .first()
+
+    // YTD: current calendar year
+    const ytdResult = await c.env.BILLING_DB.prepare(
+      `SELECT SUM(CASE WHEN entry_type = 'REVENUE' THEN amount_kobo ELSE 0 END) as revenue
+       FROM ledger_entries
+       WHERE tenant_id = ?
+         AND strftime('%Y', created_at) = strftime('%Y', 'now')`
+    )
+      .bind(tenantId)
+      .first()
+
     const summary = {
-      mtd: Number(result?.total_revenue) || 0,
-      ytd: Number(result?.total_revenue) || 0,
-      balance: (Number(result?.total_revenue) || 0) - (Number(result?.total_payouts) || 0),
+      mtd: Number(mtdResult?.revenue) || 0,
+      ytd: Number(ytdResult?.revenue) || 0,
+      balance: (Number(allTime?.total_revenue) || 0) - (Number(allTime?.total_payouts) || 0),
+      totalRevenue: Number(allTime?.total_revenue) || 0,
+      totalCommissions: Number(allTime?.total_commissions) || 0,
+      totalPayouts: Number(allTime?.total_payouts) || 0,
       lastUpdated: Date.now(),
     }
 
