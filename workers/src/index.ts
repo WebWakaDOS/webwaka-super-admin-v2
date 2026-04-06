@@ -139,6 +139,95 @@ app.use('*', async (c, next) => {
   }
 })
 
+
+// ============================================================================
+// TOTP HELPERS (T-07) — RFC 6238 / RFC 4226 using Web Crypto (no deps)
+// ============================================================================
+
+/**
+ * Encode bytes to Base32 (RFC 4648, no padding) — for QR key display
+ */
+function base32Encode(bytes: Uint8Array): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  let bits = 0, value = 0, output = ''
+  for (let i = 0; i < bytes.length; i++) {
+    value = (value << 8) | bytes[i]
+    bits += 8
+    while (bits >= 5) {
+      output += alphabet[(value >>> (bits - 5)) & 31]
+      bits -= 5
+    }
+  }
+  if (bits > 0) output += alphabet[(value << (5 - bits)) & 31]
+  return output
+}
+
+/**
+ * Decode Base32 string to Uint8Array
+ */
+function base32Decode(str: string): Uint8Array {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  const s = str.toUpperCase().replace(/=+$/, '')
+  let bits = 0, value = 0, index = 0
+  const output = new Uint8Array(Math.floor(s.length * 5 / 8))
+  for (let i = 0; i < s.length; i++) {
+    const idx = alphabet.indexOf(s[i])
+    if (idx < 0) continue
+    value = (value << 5) | idx
+    bits += 5
+    if (bits >= 8) {
+      output[index++] = (value >>> (bits - 8)) & 255
+      bits -= 8
+    }
+  }
+  return output.slice(0, index)
+}
+
+/**
+ * Generate a TOTP code for a given secret + timestamp window (RFC 6238)
+ */
+async function generateTOTP(secret: string, counter: number): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw', base32Decode(secret),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false, ['sign']
+  )
+  const counterBuf = new Uint8Array(8)
+  const view = new DataView(counterBuf.buffer)
+  view.setUint32(4, counter >>> 0, false)
+  const sig = await crypto.subtle.sign('HMAC', key, counterBuf)
+  const arr = new Uint8Array(sig)
+  const offset = arr[19] & 0x0f
+  const code = (
+    ((arr[offset] & 0x7f) << 24) |
+    ((arr[offset + 1] & 0xff) << 16) |
+    ((arr[offset + 2] & 0xff) << 8) |
+    (arr[offset + 3] & 0xff)
+  ) % 1_000_000
+  return code.toString().padStart(6, '0')
+}
+
+/**
+ * Verify a TOTP token — checks current window ±1 (±30s drift tolerance)
+ */
+async function verifyTOTP(secret: string, token: string): Promise<boolean> {
+  const counter = Math.floor(Date.now() / 1000 / 30)
+  for (const delta of [-1, 0, 1]) {
+    const expected = await generateTOTP(secret, counter + delta)
+    if (expected === token) return true
+  }
+  return false
+}
+
+/**
+ * Generate a new random 20-byte TOTP secret (Base32)
+ */
+function newTOTPSecret(): string {
+  const bytes = new Uint8Array(20)
+  crypto.getRandomValues(bytes)
+  return base32Encode(bytes)
+}
+
 // ============================================================================
 // ZOD SCHEMAS — input validation for all POST/PUT endpoints
 // ============================================================================
@@ -2513,6 +2602,167 @@ app.post('/settings/audit-log', async (c) => {
     ).bind(id, user_id, action, resource_type, resource_id || null, ip).run()
 
     return c.json(apiResponse(true, { id, action, resource_type }), { status: 201 })
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+
+// ============================================================================
+// 2FA ENDPOINTS (T-07) — TOTP setup, verify, disable
+// ============================================================================
+
+/**
+ * POST /auth/2fa/setup
+ * Generate a new TOTP secret for the authenticated user and return the
+ * provisioning URI for a QR code. The secret is NOT persisted until the
+ * user confirms with /auth/2fa/enable.
+ */
+app.post('/auth/2fa/setup', async (c) => {
+  try {
+    const session = await requireAuth(c)
+    const secret = newTOTPSecret()
+    const issuer = 'WebWaka SuperAdmin'
+    const label = encodeURIComponent(`${issuer}:${session.email}`)
+    const uri = `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`
+
+    // Store the pending secret in KV with a 10-minute TTL (not yet enabled)
+    await c.env.FEATURE_FLAGS_KV.put(
+      `2fa:pending:${session.sub}`,
+      secret,
+      { expirationTtl: 600 }
+    )
+
+    return c.json(apiResponse(true, { secret, uri }))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+/**
+ * POST /auth/2fa/enable
+ * Confirm setup by verifying the first TOTP code, then persist the secret
+ * and flip totp_enabled = 1 on the user record.
+ * Body: { token: "123456" }
+ */
+app.post('/auth/2fa/enable', async (c) => {
+  try {
+    const session = await requireAuth(c)
+    const { token } = await c.req.json()
+    if (!token || !/^\d{6}$/.test(token)) {
+      throw new HTTPException(400, { message: 'A 6-digit TOTP token is required' })
+    }
+
+    const pendingSecret = await c.env.FEATURE_FLAGS_KV.get(`2fa:pending:${session.sub}`)
+    if (!pendingSecret) {
+      throw new HTTPException(400, { message: 'No pending 2FA setup found. Call /auth/2fa/setup first.' })
+    }
+
+    const valid = await verifyTOTP(pendingSecret, token)
+    if (!valid) {
+      throw new HTTPException(400, { message: 'Invalid TOTP token. Please try again.' })
+    }
+
+    // Persist secret and enable 2FA
+    await c.env.RBAC_DB.prepare(
+      `UPDATE users SET totp_secret = ?, totp_enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    ).bind(pendingSecret, session.sub).run()
+
+    // Clean up pending KV key
+    await c.env.FEATURE_FLAGS_KV.delete(`2fa:pending:${session.sub}`)
+
+    return c.json(apiResponse(true, { enabled: true }))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+/**
+ * POST /auth/2fa/validate
+ * Used during login when 2FA is required.
+ * Body: { token: "123456" }
+ * Returns a new full-access JWT if the TOTP token is valid.
+ */
+app.post('/auth/2fa/validate', async (c) => {
+  try {
+    // This endpoint accepts a limited "2fa_pending" JWT issued at login
+    const session = await requireAuth(c)
+
+    const { token } = await c.req.json()
+    if (!token || !/^\d{6}$/.test(token)) {
+      throw new HTTPException(400, { message: 'A 6-digit TOTP token is required' })
+    }
+
+    const user = await c.env.RBAC_DB.prepare(
+      `SELECT totp_secret, totp_enabled FROM users WHERE id = ? AND status = 'ACTIVE'`
+    ).bind(session.sub).first()
+
+    if (!user || !user.totp_enabled || !user.totp_secret) {
+      throw new HTTPException(400, { message: '2FA is not enabled for this account' })
+    }
+
+    const valid = await verifyTOTP(user.totp_secret as string, token)
+    if (!valid) {
+      throw new HTTPException(401, { message: 'Invalid TOTP token' })
+    }
+
+    // Issue a new full JWT (removes 2fa_pending flag if present)
+    const permissionsResult = await c.env.RBAC_DB.prepare(
+      `SELECT p.name FROM role_permissions rp
+       JOIN permissions p ON rp.permission_id = p.id
+       WHERE rp.role_id = (SELECT id FROM roles WHERE name = ?)`
+    ).bind(session.role || 'CUSTOMER').all()
+    const permissions = permissionsResult.results?.map((r: any) => r.name) || session.permissions || []
+
+    const newToken = await signJWT(
+      { sub: session.sub, email: session.email, name: session.name, tenantId: session.tenantId, role: session.role, permissions },
+      c.env.JWT_SECRET,
+      86400
+    )
+    const maxAge = 86400
+    c.header('Set-Cookie', buildAuthCookieStr(newToken, maxAge, c.env.ENVIRONMENT || 'development'))
+
+    return c.json(apiResponse(true, { tokenExpiresAt: Math.floor(Date.now() / 1000) + maxAge }))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+/**
+ * POST /auth/2fa/disable
+ * Disable 2FA for the authenticated user. Requires current TOTP code as confirmation.
+ * Body: { token: "123456" }
+ */
+app.post('/auth/2fa/disable', async (c) => {
+  try {
+    const session = await requireAuth(c)
+    const { token } = await c.req.json()
+    if (!token || !/^\d{6}$/.test(token)) {
+      throw new HTTPException(400, { message: 'Provide your current 6-digit TOTP token to disable 2FA' })
+    }
+
+    const user = await c.env.RBAC_DB.prepare(
+      `SELECT totp_secret, totp_enabled FROM users WHERE id = ? AND status = 'ACTIVE'`
+    ).bind(session.sub).first()
+
+    if (!user || !user.totp_enabled || !user.totp_secret) {
+      throw new HTTPException(400, { message: '2FA is not currently enabled' })
+    }
+
+    const valid = await verifyTOTP(user.totp_secret as string, token)
+    if (!valid) {
+      throw new HTTPException(401, { message: 'Invalid TOTP token — cannot disable 2FA' })
+    }
+
+    await c.env.RBAC_DB.prepare(
+      `UPDATE users SET totp_secret = NULL, totp_enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    ).bind(session.sub).run()
+
+    return c.json(apiResponse(true, { disabled: true }))
   } catch (err) {
     if (err instanceof HTTPException) throw err
     throw new HTTPException(500, { message: 'Internal server error' })
