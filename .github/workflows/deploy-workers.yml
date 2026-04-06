@@ -62,6 +62,7 @@ jobs:
     needs: [lint-and-test]
     permissions:
       contents: write
+      releases: write
     environment:
       name: production
       url: https://webwaka-super-admin-api-prod.webwaka.workers.dev
@@ -96,6 +97,7 @@ jobs:
           curl -f https://webwaka-super-admin-api-prod.webwaka.workers.dev/health || echo "Health check failed (non-blocking)"
 
       - name: Create GitHub Release
+        continue-on-error: true
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
