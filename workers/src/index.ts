@@ -113,8 +113,29 @@ app.use('*', async (c, next) => {
   c.res.headers.set('X-Content-Type-Options', 'nosniff')
   c.res.headers.set('X-Frame-Options', 'DENY')
   c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  if (c.env.ENVIRONMENT === 'production') {
-    c.res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
+  c.res.headers.set('X-Permitted-Cross-Domain-Policies', 'none')
+  c.res.headers.set('Cross-Origin-Resource-Policy', 'same-origin')
+  c.res.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
+
+  // Content-Security-Policy — API worker; all directives restrictive by default
+  c.res.headers.set(
+    'Content-Security-Policy',
+    [
+      "default-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'none'",
+      "base-uri 'none'",
+    ].join('; ')
+  )
+
+  // Disable browser features not needed by an API
+  c.res.headers.set(
+    'Permissions-Policy',
+    'geolocation=(), camera=(), microphone=(), payment=(), usb=(), bluetooth=()'
+  )
+
+  if (c.env.ENVIRONMENT === 'production' || c.env.ENVIRONMENT === 'staging') {
+    c.res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
   }
 })
 
