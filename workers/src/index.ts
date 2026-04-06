@@ -2493,6 +2493,55 @@ app.post('/settings/audit-log', async (c) => {
 })
 
 // ============================================================================
+// AUDIT LOG ALIASES — /audit-log (canonical) mirrors /settings/audit-log
+// The frontend calls /audit-log; keep /settings/audit-log for backward compat.
+// ============================================================================
+app.get('/audit-log', async (c) => {
+  try {
+    await requirePermission(c, 'read:settings')
+
+    const page = Math.max(1, Number(c.req.query('page') || 1))
+    const limit = Math.min(Number(c.req.query('limit') || 50), 200)
+    const offset = (page - 1) * limit
+    const action = c.req.query('action')
+    const userId = c.req.query('user_id')
+    const search = c.req.query('search')
+
+    let query = `SELECT id, user_id, action, resource_type, resource_id, ip_address, created_at
+                 FROM audit_log WHERE 1=1`
+    const params: any[] = []
+    if (action) { query += ` AND action = ?`; params.push(action) }
+    if (userId) { query += ` AND user_id = ?`; params.push(userId) }
+    if (search) { query += ` AND (action LIKE ? OR resource_type LIKE ? OR user_id LIKE ?)`; params.push(`%${search}%`, `%${search}%`, `%${search}%`) }
+    query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    params.push(limit, offset)
+
+    // Filtered count
+    let countQuery = `SELECT COUNT(*) as total FROM audit_log WHERE 1=1`
+    const countParams: any[] = []
+    if (action) { countQuery += ` AND action = ?`; countParams.push(action) }
+    if (userId) { countQuery += ` AND user_id = ?`; countParams.push(userId) }
+    if (search) { countQuery += ` AND (action LIKE ? OR resource_type LIKE ? OR user_id LIKE ?)`; countParams.push(`%${search}%`, `%${search}%`, `%${search}%`) }
+
+    const [results, countResult] = await Promise.all([
+      c.env.RBAC_DB.prepare(query).bind(...params).all(),
+      countParams.length
+        ? c.env.RBAC_DB.prepare(countQuery).bind(...countParams).first()
+        : c.env.RBAC_DB.prepare(countQuery).first(),
+    ])
+
+    return c.json(apiResponse(true, {
+      entries: results.results,
+      pagination: { page, limit, total: Number(countResult?.total || 0) },
+    }))
+  } catch (err) {
+    if (err instanceof HTTPException) throw err
+    console.error('Error fetching audit log:', err)
+    throw new HTTPException(500, { message: 'Internal server error' })
+  }
+})
+
+// ============================================================================
 // ERROR HANDLING
 // ============================================================================
 
